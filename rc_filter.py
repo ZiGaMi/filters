@@ -21,7 +21,7 @@ import numpy as np
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 20.0
+TIME_WINDOW = 0.5
 
 ## Number of samples in time window
 SAMPLE_NUM = 10000
@@ -36,19 +36,19 @@ INPUT_SIGNAL_SELECTION = INPUT_RECT
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 0.1
+INPUT_SIGNAL_FREQ = 100
 
 ## LPF fc
 #
 # Unit: Hz
-LPF_FC_1 = 1.0
-LPF_FC_2 = 2.0
-LPF_FC_3 = 3.0
+LPF_FC_1 = 100.0
+LPF_FC_2 = 100.0
+LPF_FC_3 = 100.0
 
 ## LPF order
 LPF_ORDER_1 = 1
-LPF_ORDER_2 = 2
-LPF_ORDER_3 = 3
+LPF_ORDER_2 = 10
+LPF_ORDER_3 = 5
 
 ## HPF fc
 #
