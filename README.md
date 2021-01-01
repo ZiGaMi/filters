@@ -26,7 +26,7 @@ This example shows signal acquire from accelerometer and RC low pass filter in w
 ## TODO
  - [x] Evaluation of RC filter in python
  - [x] Evaluation of CR filter in python
- - [ ] Implementation of RC filter in C   
+ - [x] Implementation of RC filter in C   
  - [ ] Implementation of CR filter in C   
  - [ ] Evaluation of FIR filter in python   
  - [ ] Implementation of FIR filter in C   
