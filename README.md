@@ -2,13 +2,13 @@
 
 This repository contains simulations in Python using Matplotlib and C implementation tested on STM32 platfrom. All filters evaluated in simulations are realized in C for embeeded application use. 
 
----
+
 ## List of all filters
  - RC filter (LPF)
  - CR filter (HPF)
  - FIR
 
----
+
 ## Simulations
 For signals written in CSV file use ***filter_csv.py*** script with -f argument to select file to analyse. 
 
@@ -24,15 +24,16 @@ This example shows signal acquire from accelerometer and RC low pass filter in w
 
 ![](simulations/pics/filter_analysis_example.png)
 
----
+
 ## C implementation
-#### RC filter
+### RC filter
 There are only two functions being a part of RC filter API:
  - *filter_status_t ***filter_rc_init***(p_filter_rc_t * p_filter_inst, const float32_t fc, const float32_t dt, const uint8_t order, const float32_t init_value)*
  - *float32_t ***filter_rc_update***(p_filter_rc_t p_filter_inst, const float32_t x)*
 
  ##### Example of usage
-```
+
+```C
 // 1. Declare filter instance
 p_filter_rc_t my_filter_inst;
 
@@ -54,10 +55,9 @@ loop @SAMPLE_TIME
     // Update filter
     filtered_signal = filter_rc_update( my_filter_inst, raw_signal );
 }
+
 ```
 
-
----
 ## TODO
  - [x] Evaluation of RC filter in python
  - [x] Evaluation of CR filter in python
