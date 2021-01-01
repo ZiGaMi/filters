@@ -1,10 +1,9 @@
 # ===============================================================================
-# @file:    rc_filter.py
-# @note:    This script is evaluation of RC filter algorithm
+# @file:    filter_csv.py
+# @note:    Filter signals from CSV file
 # @author:  Ziga Miklosic
-# @date:    31.12.2020
-# @brief:   Evaluation of RC/CR filter design. Implemented are HPF and LPF
-#           with configurable fc and order. 
+# @date:    01.01.2021
+# @brief:   This scripts read signal from CSV file and applies filter to it. 
 # ===============================================================================
 
 # ===============================================================================
