@@ -21,7 +21,7 @@ import numpy as np
 ## Sample frequency
 #
 # Unit: Hz
-SAMPLE_FREQ = 100
+SAMPLE_FREQ = 1000
 
 ## Time window
 #
@@ -36,19 +36,19 @@ INPUT_SINE = 0
 INPUT_RECT = 1
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_SINE
+INPUT_SIGNAL_SELECTION = INPUT_RECT
 
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 10
+INPUT_SIGNAL_FREQ = 100
 
 ## LPF fc
 #
 # Unit: Hz
 LPF_FC_1 = 10.0
-LPF_FC_2 = 100.0
-LPF_FC_3 = 100.0
+LPF_FC_2 = 10.0
+LPF_FC_3 = 10.0
 
 ## LPF order
 LPF_ORDER_1 = 1
@@ -261,14 +261,16 @@ FIR_COEFFICIENT = [
 
 if __name__ == "__main__":
 
-    
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
     # Filter object
-    _filter_LPF_1   = RC_LPF( fc=LPF_FC_1, dt=_dt, order=LPF_ORDER_1, init_val=0)
-    #_filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt, order=LPF_ORDER_2, init_val=1.0)
-    #_filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt, order=LPF_ORDER_3, init_val=1.5)
+    _filter_LPF_1   = RC_LPF( fc=LPF_FC_1, dt=_dt,              order=LPF_ORDER_1, init_val=0)
+    _filter_D_LPF_1 = RC_LPF( fc=LPF_FC_1, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_1, init_val=0)
+    _filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt,              order=LPF_ORDER_2, init_val=1.0)
+    _filter_D_LPF_2 = RC_LPF( fc=LPF_FC_2, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_2, init_val=1.0)
+    _filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt,              order=LPF_ORDER_3, init_val=1.5)
+    _filter_D_LPF_3 = RC_LPF( fc=LPF_FC_3, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_3, init_val=1.5)
     
     _filter_HPF_1   = CR_HPF( fc=HPF_FC_1, dt=_dt, order=HPF_ORDER_1)
     _filter_HPF_2   = CR_HPF( fc=HPF_FC_2, dt=_dt, order=HPF_ORDER_2)
@@ -278,10 +280,14 @@ if __name__ == "__main__":
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
+    _x_d = [0]
 
     _y_lpf_1 = []
+    _y_d_lpf_1 = [0]
     _y_lpf_2 = []
+    _y_d_lpf_2 = [0]
     _y_lpf_3 = []
+    _y_d_lpf_3 = [0]
 
     _y_hpf_1 = []
     _y_hpf_2 = []
@@ -294,8 +300,10 @@ if __name__ == "__main__":
     _sin_x = []
     _rect_x = []
 
-    # Down sample conunter
+    # Down sample
     _downsamp_cnt = 0
+    _downsamp_samp = [0]
+    _d_time = [0]
     
     for n in range(SAMPLE_NUM):
         _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
@@ -309,8 +317,8 @@ if __name__ == "__main__":
 
         # LPF
         _y_lpf_1.append( _filter_LPF_1.update( _x[n] ) )
-        #_y_lpf_2.append( _filter_LPF_2.update( _x[n] ) )
-        #_y_lpf_3.append( _filter_LPF_3.update( _x[n] ) )
+        _y_lpf_2.append( _filter_LPF_2.update( _x[n] ) )
+        _y_lpf_3.append( _filter_LPF_3.update( _x[n] ) )
 
         # HPF
         _y_hpf_1.append( _filter_HPF_1.update( _x[n] ) )
@@ -324,6 +332,16 @@ if __name__ == "__main__":
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
             _downsamp_cnt = 0
 
+            # Utils
+            _downsamp_samp.append(0)
+            _d_time.append( _time[n])
+            _x_d.append( _x[n] )
+
+            # LPF
+            _y_d_lpf_1.append( _filter_D_LPF_1.update( _x_d[-1] ) )
+            _y_d_lpf_2.append( _filter_D_LPF_2.update( _x_d[-1] ) )
+            _y_d_lpf_3.append( _filter_D_LPF_3.update( _x_d[-1] ) )
+
             # FIR 
             _y_fir.append( _filter_FIR.update( _x[n] ) )
             _time_fir.append( _time[n] )
@@ -331,37 +349,52 @@ if __name__ == "__main__":
             _downsamp_cnt += 1
     
     # Plot results
-    fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1)
+    fig, ax = plt.subplots(3, 2)
     fig.suptitle("Input signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz", fontsize=20)
-    ax_1.plot( _time, _x, "b", label="input" )
-    ax_1.plot( _time, _y_lpf_1, "g", label=  str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
-    #ax_1.plot( _time, _y_lpf_2, "r", label=  str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2) )
-    #ax_1.plot( _time, _y_lpf_3, "y", label=  str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3) )
-    ax_1.grid()
-    ax_1.title.set_text("RC Low Pass Filter")
-    #ax_1.set_xlabel("Time [s]")
-    ax_1.set_ylabel("Amplitude")
-    ax_1.legend(loc="upper right")
+    ax[0,0].plot( _time, _x, "b", label="Input-generated" )
+    ax[0,0].plot( _time, _y_lpf_1, "g", label="Ideal filter")
+    ax[0,0].plot( _d_time, _downsamp_samp, "r.", label="Sample points")
+    ax[0,0].plot( _time, _y_lpf_1, "g", label="RC1: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
+    ax[0,0].plot( _time, _y_lpf_2, "r", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
+    ax[0,0].plot( _time, _y_lpf_3, "y", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
+    ax[0,0].grid()
+    ax[0,0].title.set_text("RC Low Pass Filter - Ideal (fs=" + str( 1 / _dt ) + "Hz)")
+    ax[0,0].set_ylabel("Amplitude")
+    ax[0,0].legend(loc="upper right")
 
-    ax_2.plot( _time, _x, "b" )
-    ax_2.plot( _time, _y_hpf_1, "g", label=  str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
-    ax_2.plot( _time, _y_hpf_2, "r", label=  str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
-    ax_2.plot( _time, _y_hpf_3, "y", label=  str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
-    ax_2.grid()
-    ax_2.title.set_text("CR High Pass Filter")
-    #ax_2.set_xlabel("Time [s]")
-    ax_2.set_ylabel("Amplitude")
-    ax_2.legend(loc="upper right")
+
+    ax[0,1].plot( _d_time, _x_d, "b.-", label="Input-sampled")
+    ax[0,1].plot( _d_time, _y_d_lpf_1, "g.-", label="RC1: " + str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
+    ax[0,1].plot( _d_time, _y_d_lpf_2, "r.-", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
+    ax[0,1].plot( _d_time, _y_d_lpf_3, "y.-", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
+    ax[0,1].grid()
+    ax[0,1].title.set_text("RC Low Pass Filter - Real (fs=" + str(SAMPLE_FREQ) + "Hz)")
+    ax[0,1].legend(loc="upper right")
+
+
+    ax[1,0].plot( _time, _x, "b" )
+    ax[1,0].plot( _time, _y_hpf_1, "g", label=  str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
+    ax[1,0].plot( _time, _y_hpf_2, "r", label=  str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
+    ax[1,0].plot( _time, _y_hpf_3, "y", label=  str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
+    ax[1,0].grid()
+    ax[1,0].title.set_text("CR High Pass Filter")
+    #ax[1,0].set_xlabel("Time [s]")
+    ax[1,0].set_ylabel("Amplitude")
+    ax[1,0].legend(loc="upper right")
 
     
-    ax_3.plot( _time, _x, "b" )
-    ax_3.plot( _time_fir, _y_fir, "g")
-    ax_3.grid()
-    ax_3.title.set_text("FIR filter")
-    ax_3.set_xlabel("Time [s]")
-    ax_3.set_ylabel("Amplitude")
-    #ax_3.legend(loc="upper right")
+    ax[2,0].plot( _time, _x, "b" )
+    ax[2,0].plot( _time_fir, _y_fir, "g")
+    ax[2,0].grid()
+    ax[2,0].title.set_text("FIR filter")
+    ax[2,0].set_xlabel("Time [s]")
+    ax[2,0].set_ylabel("Amplitude")
+    #ax[2,0].legend(loc="upper right")
+
+
+    ax[2,1].set_xlabel("Time [s]")
     
+    plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
 
     plt.show()
     
