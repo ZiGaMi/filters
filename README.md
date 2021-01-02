@@ -104,7 +104,7 @@ For signals written in CSV file use ***filter_csv.py*** script with -f argument 
 >>>py filter_csv.py -f ..\..\test_data\steward_imu_roll_pitch_full_range_1_0Hz.csv
 ```
 
-In simulations signal is being shown in time and frequency domain. By inspecting frequency signature of raw filter cutoff frequency of selected filter can be easily determine. 
+In simulations signal is being shown in time and frequency domain. By inspecting frequency signature of raw signal cutoff frequency of selected filter can be easily determine. 
 
 ##### Example of accelerometer data filtering
 This example shows signal acquire from accelerometer and RC low pass filter in work. Upper picture shows raw and filtered signals in time domain and bottom shows same signals in frequency domain.
