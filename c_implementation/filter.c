@@ -27,6 +27,7 @@
 #include "filter.h"
 #include "stdint.h"
 #include "stdlib.h"
+#include "math.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Definitions
@@ -94,7 +95,7 @@ filter_status_t filter_rc_init(p_filter_rc_t * p_filter_inst, const float32_t fc
 			&& 	( NULL != (*p_filter_inst)->p_y ))
 		{
 			// Calculate coefficient
-			(*p_filter_inst)->alpha = (float32_t) ( dt / ( dt + ( 1.0f / fc )));
+			(*p_filter_inst)->alpha = (float32_t) ( dt / ( dt + ( 1.0f / ( M_TWOPI * fc ))));
 
 			// Store order
 			(*p_filter_inst)->order = order;
@@ -181,7 +182,7 @@ filter_status_t filter_cr_init(p_filter_cr_t * p_filter_inst, const float32_t fc
 			&&	( NULL != (*p_filter_inst)->p_x ))
 		{
 			// Calculate coefficient
-			(*p_filter_inst)->alpha = (float32_t) (( 1.0f / fc ) / ( dt + ( 1.0f / fc )));
+			(*p_filter_inst)->alpha = (float32_t) (( 1.0f / ( M_TWOPI * fc )) / ( dt + ( 1.0f / ( M_TWOPI * fc ))));
 
 			// Store order
 			(*p_filter_inst)->order = order;

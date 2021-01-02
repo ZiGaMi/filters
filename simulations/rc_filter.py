@@ -1,6 +1,6 @@
 # ===============================================================================
 # @file:    rc_filter.py
-# @note:    This script is evaluation of RC filter algorithm
+# @note:    This script is evaluation of RC/CR filter algorithm
 # @author:  Ziga Miklosic
 # @date:    31.12.2020
 # @brief:   Evaluation of RC/CR filter design. Implemented are HPF and LPF
@@ -18,54 +18,70 @@ import numpy as np
 #       CONSTANTS
 # ===============================================================================
 
+## ****** USER CONFIGURATIONS ******
+
 ## Sample frequency
+#   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 1000
+SAMPLE_FREQ = 100.0
+
+# Ideal sample frequency
+#   As a reference to sample rate constrained embedded system
+#
+# Unit: Hz
+IDEAL_SAMPLE_FREQ = 20000.0
 
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 0.5
-
-## Number of samples in time window
-SAMPLE_NUM = 10000
+TIME_WINDOW = 2.5
 
 ## Select input filter signal type
 INPUT_SINE = 0
 INPUT_RECT = 1
 
+## Input signal shape
+INPUT_SIGNAL_AMPLITUDE = 1.0
+INPUT_SIGNAL_OFFSET = 0.0
+INPUT_SIGNAL_PHASE = 0.0
+
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_RECT
+INPUT_SIGNAL_SELECTION = INPUT_SINE
 
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 100
+INPUT_SIGNAL_FREQ = 5
 
 ## LPF fc
 #
 # Unit: Hz
-LPF_FC_1 = 10.0
-LPF_FC_2 = 10.0
-LPF_FC_3 = 10.0
+LPF_FC_1 = 5.0
+LPF_FC_2 = 5.0
+LPF_FC_3 = 5.0
 
 ## LPF order
 LPF_ORDER_1 = 1
-LPF_ORDER_2 = 10
-LPF_ORDER_3 = 5
+LPF_ORDER_2 = 2
+LPF_ORDER_3 = 3
 
 ## HPF fc
 #
 # Unit: Hz
-HPF_FC_1 = 10.0
-HPF_FC_2 = 20.0
-HPF_FC_3 = 30.0
+HPF_FC_1 = 0.1
+HPF_FC_2 = 0.1
+HPF_FC_3 = 0.1
 
 ## HPF order
 HPF_ORDER_1 = 1
-HPF_ORDER_2 = 10
-HPF_ORDER_3 = 5
+HPF_ORDER_2 = 2
+HPF_ORDER_3 = 3
+
+## ****** END OF USER CONFIGURATIONS ******
+
+## Number of samples in time window
+SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 
 
 # ===============================================================================
@@ -182,83 +198,9 @@ class CR_HPF:
 
 
 
-class CircularBuffer:
-
-    def __init__(self, size):
-        self.buf = [0.0] * size
-        self.idx = 0
-        self.size = size
-    
-    def __manage_index(self):
-        if self.idx >= (self.size - 1):
-            self.idx = 0
-        else:
-            self.idx = self.idx + 1
-
-    def set(self, val):
-        if self.idx < self.size:
-            self.buf[self.idx] = val
-            self.__manage_index()
-        else:
-            raise AssertionError
-
-    def get(self, idx):
-        if self.idx < self.size:
-            return self.buf[self.idx]
-        else:
-            raise AssertionError
-
-class FIR:
-
-    def __init__(self, tap, coef):
-
-        # Store tap number and coefficient
-        self.tap = tap
-        self.coef = coef
-
-        # Create circular buffer
-        self.buf = CircularBuffer(size=tap)
-
-
-    def update(self, x):
-        
-        # Fill buffer
-        self.buf.set( x )
-
-        # Convolve
-        y = 0
-        for j in range(self.tap):
-            y += ( self.coef[j] * self.buf.get( self.tap - j ))
-
-        return y
-
-
-
-
 # ===============================================================================
 #       MAIN ENTRY
 # ===============================================================================
-
-FIR_TAP_NUM = 16
-FIR_COEFFICIENT = [
-993.7115243977110590E-6,
- 0.011898750525239039,
- 0.026093294471711985,
- 0.048239818572596682,
- 0.074979302516632151,
- 0.102206493068131094,
- 0.124584980431458908,
- 0.137240329406428413,
- 0.137240329406428413,
- 0.124584980431458908,
- 0.102206493068131094,
- 0.074979302516632151,
- 0.048239818572596682,
- 0.026093294471711985,
- 0.011898750525239039,
- 993.7115243977110590E-6,
-]
-
 if __name__ == "__main__":
 
     # Time array
@@ -267,16 +209,17 @@ if __name__ == "__main__":
     # Filter object
     _filter_LPF_1   = RC_LPF( fc=LPF_FC_1, dt=_dt,              order=LPF_ORDER_1, init_val=0)
     _filter_D_LPF_1 = RC_LPF( fc=LPF_FC_1, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_1, init_val=0)
-    _filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt,              order=LPF_ORDER_2, init_val=1.0)
-    _filter_D_LPF_2 = RC_LPF( fc=LPF_FC_2, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_2, init_val=1.0)
-    _filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt,              order=LPF_ORDER_3, init_val=1.5)
-    _filter_D_LPF_3 = RC_LPF( fc=LPF_FC_3, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_3, init_val=1.5)
+    _filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt,              order=LPF_ORDER_2, init_val=0)
+    _filter_D_LPF_2 = RC_LPF( fc=LPF_FC_2, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_2, init_val=0)
+    _filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt,              order=LPF_ORDER_3, init_val=0)
+    _filter_D_LPF_3 = RC_LPF( fc=LPF_FC_3, dt=(1/SAMPLE_FREQ),  order=LPF_ORDER_3, init_val=0)
     
-    _filter_HPF_1   = CR_HPF( fc=HPF_FC_1, dt=_dt, order=HPF_ORDER_1)
-    _filter_HPF_2   = CR_HPF( fc=HPF_FC_2, dt=_dt, order=HPF_ORDER_2)
-    _filter_HPF_3   = CR_HPF( fc=HPF_FC_3, dt=_dt, order=HPF_ORDER_3)
-
-    _filter_FIR     = FIR( FIR_TAP_NUM, FIR_COEFFICIENT )
+    _filter_HPF_1   = CR_HPF( fc=HPF_FC_1, dt=_dt,              order=HPF_ORDER_1)
+    _filter_D_HPF_1 = CR_HPF( fc=HPF_FC_1, dt=(1/SAMPLE_FREQ),  order=HPF_ORDER_1)
+    _filter_HPF_2   = CR_HPF( fc=HPF_FC_2, dt=_dt,              order=HPF_ORDER_2)
+    _filter_D_HPF_2 = CR_HPF( fc=HPF_FC_2, dt=(1/SAMPLE_FREQ),  order=HPF_ORDER_2)
+    _filter_HPF_3   = CR_HPF( fc=HPF_FC_3, dt=_dt,              order=HPF_ORDER_3)
+    _filter_D_HPF_3 = CR_HPF( fc=HPF_FC_3, dt=(1/SAMPLE_FREQ),  order=HPF_ORDER_2)
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -290,11 +233,11 @@ if __name__ == "__main__":
     _y_d_lpf_3 = [0]
 
     _y_hpf_1 = []
+    _y_d_hpf_1 = [0]
     _y_hpf_2 = []
+    _y_d_hpf_2 = [0]
     _y_hpf_3 = []
-
-    _y_fir = []
-    _time_fir = []
+    _y_d_hpf_3 = [0]
 
     # Generate inputs
     _sin_x = []
@@ -306,8 +249,8 @@ if __name__ == "__main__":
     _d_time = [0]
     
     for n in range(SAMPLE_NUM):
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE ))  
+        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE ))  
  
     # Apply filter
     for n in range(SAMPLE_NUM):
@@ -325,9 +268,6 @@ if __name__ == "__main__":
         _y_hpf_2.append( _filter_HPF_2.update( _x[n] ) )
         _y_hpf_3.append( _filter_HPF_3.update( _x[n] ) )
 
-
-
-
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
             _downsamp_cnt = 0
@@ -342,57 +282,57 @@ if __name__ == "__main__":
             _y_d_lpf_2.append( _filter_D_LPF_2.update( _x_d[-1] ) )
             _y_d_lpf_3.append( _filter_D_LPF_3.update( _x_d[-1] ) )
 
-            # FIR 
-            _y_fir.append( _filter_FIR.update( _x[n] ) )
-            _time_fir.append( _time[n] )
+            # HPF
+            _y_d_hpf_1.append( _filter_D_HPF_1.update( _x_d[-1] ) )
+            _y_d_hpf_2.append( _filter_D_HPF_2.update( _x_d[-1] ) )
+            _y_d_hpf_3.append( _filter_D_HPF_3.update( _x_d[-1] ) )
+
         else:
             _downsamp_cnt += 1
     
     # Plot results
-    fig, ax = plt.subplots(3, 2)
+    fig, ax = plt.subplots(2, 2, sharex="row", sharey="row")
     fig.suptitle("Input signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz", fontsize=20)
+    
     ax[0,0].plot( _time, _x, "b", label="Input-generated" )
     ax[0,0].plot( _time, _y_lpf_1, "g", label="Ideal filter")
     ax[0,0].plot( _d_time, _downsamp_samp, "r.", label="Sample points")
-    ax[0,0].plot( _time, _y_lpf_1, "g", label="RC1: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
+    ax[0,0].plot( _time, _y_lpf_1, "g", label="RC1: " + str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
     ax[0,0].plot( _time, _y_lpf_2, "r", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
     ax[0,0].plot( _time, _y_lpf_3, "y", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
     ax[0,0].grid()
-    ax[0,0].title.set_text("RC Low Pass Filter - Ideal (fs=" + str( 1 / _dt ) + "Hz)")
+    ax[0,0].title.set_text( "RC Low Pass Filter \n'CONTINOUS' TIME DOMAIN \nfs=" + str( 1 / _dt ) + "Hz\n \
+    fc1/fs=" + str(LPF_FC_1/IDEAL_SAMPLE_FREQ) + " fc2/fs=" + str(LPF_FC_2/IDEAL_SAMPLE_FREQ) + " fc3/fs=" + str(LPF_FC_3/IDEAL_SAMPLE_FREQ))
     ax[0,0].set_ylabel("Amplitude")
     ax[0,0].legend(loc="upper right")
-
 
     ax[0,1].plot( _d_time, _x_d, "b.-", label="Input-sampled")
     ax[0,1].plot( _d_time, _y_d_lpf_1, "g.-", label="RC1: " + str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
     ax[0,1].plot( _d_time, _y_d_lpf_2, "r.-", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
     ax[0,1].plot( _d_time, _y_d_lpf_3, "y.-", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
     ax[0,1].grid()
-    ax[0,1].title.set_text("RC Low Pass Filter - Real (fs=" + str(SAMPLE_FREQ) + "Hz)")
+    ax[0,1].title.set_text( "RC Low Pass Filter \nDISCRETE TIME DOMAIN (on embedded system)\n fs=" + str(SAMPLE_FREQ) + "Hz\n \
+    fc1/fs=" + str(LPF_FC_1/SAMPLE_FREQ) + " fc2/fs=" + str(LPF_FC_2/SAMPLE_FREQ) + " fc3/fs=" + str(LPF_FC_3/SAMPLE_FREQ))
     ax[0,1].legend(loc="upper right")
 
-
     ax[1,0].plot( _time, _x, "b" )
-    ax[1,0].plot( _time, _y_hpf_1, "g", label=  str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
-    ax[1,0].plot( _time, _y_hpf_2, "r", label=  str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
-    ax[1,0].plot( _time, _y_hpf_3, "y", label=  str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
+    ax[1,0].plot( _time, _y_hpf_1, "g", label="RC1: " + str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
+    ax[1,0].plot( _time, _y_hpf_2, "r", label="CR2: " + str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
+    ax[1,0].plot( _time, _y_hpf_3, "y", label="CR2: " + str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
     ax[1,0].grid()
     ax[1,0].title.set_text("CR High Pass Filter")
-    #ax[1,0].set_xlabel("Time [s]")
     ax[1,0].set_ylabel("Amplitude")
     ax[1,0].legend(loc="upper right")
 
-    
-    ax[2,0].plot( _time, _x, "b" )
-    ax[2,0].plot( _time_fir, _y_fir, "g")
-    ax[2,0].grid()
-    ax[2,0].title.set_text("FIR filter")
-    ax[2,0].set_xlabel("Time [s]")
-    ax[2,0].set_ylabel("Amplitude")
-    #ax[2,0].legend(loc="upper right")
-
-
-    ax[2,1].set_xlabel("Time [s]")
+    ax[1,1].plot( _d_time, _x_d, "b.-" )
+    ax[1,1].plot( _d_time, _y_d_hpf_1, "g.-", label="CR1: " + str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
+    ax[1,1].plot( _d_time, _y_d_hpf_2, "r.-", label="CR2: " + str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
+    ax[1,1].plot( _d_time, _y_d_hpf_3, "y.-", label="CR2: " + str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
+    ax[1,1].grid()
+    ax[1,1].title.set_text("CR High Pass Filter")
+    ax[1,1].set_ylabel("Amplitude")
+    ax[1,1].legend(loc="upper right")
+    ax[1,1].set_xlabel("Time [s]")
     
     plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
 
