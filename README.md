@@ -1,6 +1,6 @@
 ## Description
 
-This repository contains simulations in Python using Matplotlib and C implementation tested on STM32 platfrom. All filters evaluated in simulations are realized in C for embeeded application use. 
+This repository contains simulations in Python using Matplotlib and C implementation tested on STM32 platfrom. All filters evaluated in simulations are realized in C for general embedded application use. 
 
 
 ## List of all filters

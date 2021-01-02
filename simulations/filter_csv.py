@@ -16,7 +16,7 @@ import argparse
 from scipy.fft import rfft, rfftfreq
 import numpy as np
 
-from rc_filter import RC_LPF
+from rc_filter import RC_LPF, RC_HPF
 
 # ===============================================================================
 #       CONSTANTS
@@ -85,6 +85,10 @@ if __name__ == "__main__":
 	# RC LPF
 	_rc_lpf = RC_LPF( 40.0, SAMPLE_TIME, 2 )
 	_rc_lpf_1 = RC_LPF( 50.0, SAMPLE_TIME, 3 )
+
+	# RC HPF
+	_rc_hpf = RC_HPF( 10.0, SAMPLE_TIME, 2 )
+	_rc_hpf_1 = RC_HPF( 20.0, SAMPLE_TIME, 3 )
 	
 	# Check for file
 	if args["file"] != None:
@@ -107,16 +111,21 @@ if __name__ == "__main__":
 				if idx > 0:
                 	
 					_time.append( _time[-1] + SAMPLE_TIME )
-					_signal.append( float(row[0]) )
+					_signal.append( float(row[0]) + 1.0 )
 
-					_signal_filter.append( _rc_lpf.update( _signal[-1] ) )
-					_signal_filter_1.append( _rc_lpf_1.update( _signal[-1] ) )
+					# This is LPF
+					#_signal_filter.append( _rc_lpf.update( _signal[-1] ) )
+					#_signal_filter_1.append( _rc_lpf_1.update( _signal[-1] ) )
 
+					# This is HPF
+					_signal_filter.append( _rc_hpf.update( _signal[-1] ) )
+					_signal_filter_1.append( _rc_hpf_1.update( _signal[-1] ) )
 				else:
 					_time.append( 0.0 )
 					_signal.append( 0.0 )
 
-					_signal_filter.append( 0.0 )
+					#_signal_filter.append( 0.0 )
+					_signal_filter.append( 1.0 )
 					_signal_filter_1.append( 0.0 )
 
 				# Sample number

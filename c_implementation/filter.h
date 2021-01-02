@@ -3,7 +3,7 @@
 *@file      filter.h
 *@brief     Various filter designs
 *@author    Ziga Miklosic
-*@date      01.01.2021
+*@date      02.01.2021
 *@version   V0.0.1
 */
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,9 +38,14 @@ typedef enum
 
 
 /**
- * 	Pointer to filter RC instance
+ * 	RC filter pointer type
  */
 typedef struct filter_rc_s * p_filter_rc_t;
+
+/**
+ * 	CR filter pointer type
+ */
+typedef struct filter_cr_s * p_filter_cr_t;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +53,8 @@ typedef struct filter_rc_s * p_filter_rc_t;
 ////////////////////////////////////////////////////////////////////////////////
 filter_status_t filter_rc_init		(p_filter_rc_t * p_filter_inst, const float32_t fc, const float32_t dt, const uint8_t order, const float32_t init_value);
 float32_t 		filter_rc_update	(p_filter_rc_t filter_inst, const float32_t x);
-
-
+filter_status_t filter_cr_init		(p_filter_cr_t * p_filter_inst, const float32_t fc, const float32_t dt, const uint8_t order);
+float32_t 		filter_cr_update	(p_filter_cr_t filter_inst, const float32_t x);
 
 
 #endif // __FILTER_H

@@ -53,14 +53,14 @@ LPF_ORDER_3 = 5
 ## HPF fc
 #
 # Unit: Hz
-HPF_FC_1 = 1.0
-HPF_FC_2 = 2.0
-HPF_FC_3 = 3.0
+HPF_FC_1 = 10.0
+HPF_FC_2 = 20.0
+HPF_FC_3 = 30.0
 
 ## HPF order
 HPF_ORDER_1 = 1
-HPF_ORDER_2 = 2
-HPF_ORDER_3 = 3
+HPF_ORDER_2 = 10
+HPF_ORDER_3 = 5
 
 
 # ===============================================================================
@@ -149,7 +149,7 @@ class RC_LPF:
 ## RC High Pass Filter
 class RC_HPF:
 
-    def __init__(self, fc, dt, order=1, init_val=0):
+    def __init__(self, fc, dt, order=1):
 
         # Calculate filter coefficient
         self.k = (1/fc) / ( dt + 1/fc )
@@ -158,8 +158,8 @@ class RC_HPF:
         self.order = order
 
         # Init inputs & outputs
-        self.y = [init_val] * order
-        self.x = [init_val] * order
+        self.y = [0] * order
+        self.x = [0] * order
 
     def update(self, x):
 
@@ -187,12 +187,12 @@ if __name__ == "__main__":
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
     # Filter object
-    _filter_LPF_1   = RC_LPF( fc=LPF_FC_1, dt=_dt, order=LPF_ORDER_1, init_val=0)
-    _filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt, order=LPF_ORDER_2, init_val=0)
-    _filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt, order=LPF_ORDER_3, init_val=0)
-    _filter_HPF_1   = RC_HPF( fc=HPF_FC_1, dt=_dt, order=HPF_ORDER_1, init_val=0)
-    _filter_HPF_2   = RC_HPF( fc=HPF_FC_2, dt=_dt, order=HPF_ORDER_2, init_val=0)
-    _filter_HPF_3   = RC_HPF( fc=HPF_FC_3, dt=_dt, order=HPF_ORDER_3, init_val=0)
+    _filter_LPF_1   = RC_LPF( fc=LPF_FC_1, dt=_dt, order=LPF_ORDER_1, init_val=0.5)
+    _filter_LPF_2   = RC_LPF( fc=LPF_FC_2, dt=_dt, order=LPF_ORDER_2, init_val=1.0)
+    _filter_LPF_3   = RC_LPF( fc=LPF_FC_3, dt=_dt, order=LPF_ORDER_3, init_val=1.5)
+    _filter_HPF_1   = RC_HPF( fc=HPF_FC_1, dt=_dt, order=HPF_ORDER_1)
+    _filter_HPF_2   = RC_HPF( fc=HPF_FC_2, dt=_dt, order=HPF_ORDER_2)
+    _filter_HPF_3   = RC_HPF( fc=HPF_FC_3, dt=_dt, order=HPF_ORDER_3)
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -230,20 +230,25 @@ if __name__ == "__main__":
     
     # Plot results
     fig, (ax_1, ax_2) = plt.subplots(2, 1)
+    fig.suptitle("Input signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz", fontsize=20)
     ax_1.plot( _time, _x, "b", label="input" )
     ax_1.plot( _time, _y_lpf_1, "g", label=  str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
     ax_1.plot( _time, _y_lpf_2, "r", label=  str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2) )
     ax_1.plot( _time, _y_lpf_3, "y", label=  str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3) )
     ax_1.grid()
-    ax_1.title.set_text("RC Low Pass Filter (input freq:" + str(INPUT_SIGNAL_FREQ) + "Hz)")
+    ax_1.title.set_text("RC Low Pass Filter")
+    ax_1.set_xlabel("Time [s]")
+    ax_1.set_ylabel("Amplitude")
     ax_1.legend(loc="upper right")
 
     ax_2.plot( _time, _x, "b" )
     ax_2.plot( _time, _y_hpf_1, "g", label=  str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
     ax_2.plot( _time, _y_hpf_2, "r", label=  str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
-    ax_2.plot( _time, _y_hpf_3, "g", label=  str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
+    ax_2.plot( _time, _y_hpf_3, "y", label=  str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
     ax_2.grid()
-    ax_2.title.set_text("CR High Pass Filter (input freq:" + str(INPUT_SIGNAL_FREQ) + "Hz)")
+    ax_2.title.set_text("CR High Pass Filter")
+    ax_2.set_xlabel("Time [s]")
+    ax_2.set_ylabel("Amplitude")
     ax_2.legend(loc="upper right")
 
     plt.show()
