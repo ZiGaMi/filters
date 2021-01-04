@@ -12,6 +12,7 @@
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import firwin, freqz, kaiserord
 
 # ===============================================================================
 #       CONSTANTS
@@ -32,7 +33,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 0.5
+TIME_WINDOW = 2.5
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -42,12 +43,12 @@ INPUT_SINE = 0
 INPUT_RECT = 1
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_RECT
+INPUT_SIGNAL_SELECTION = INPUT_SINE
 
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 100
+INPUT_SIGNAL_FREQ = 10
 
 
 
@@ -110,7 +111,7 @@ def generate_rect(time, freq, amp, off, phase):
 # ===============================================================================
 
 
-class CircularBuffer:
+class CircBuffer:
 
     def __init__(self, size):
         self.buf = [0.0] * size
@@ -131,10 +132,16 @@ class CircularBuffer:
             raise AssertionError
 
     def get(self, idx):
-        if self.idx < self.size:
-            return self.buf[self.idx]
+        if idx < self.size:
+            return self.buf[idx]
         else:
             raise AssertionError
+    
+    def get_tail(self):
+        return self.idx
+
+    def get_whole_buffer(self):
+        return self.buf
 
 class FIR:
 
@@ -145,7 +152,7 @@ class FIR:
         self.coef = coef
 
         # Create circular buffer
-        self.buf = CircularBuffer(size=tap)
+        self.buf = CircBuffer(size=tap)
 
 
     def update(self, x):
@@ -153,10 +160,26 @@ class FIR:
         # Fill buffer
         self.buf.set( x )
 
+        # Get tail index of circ buffer
+        tail = self.buf.get_tail()
+
+        # Offset by one
+        if tail >= ( self.tap - 1 ):
+            tail = 0
+        else:
+            tail = tail + 1
+
         # Convolve
         y = 0
         for j in range(self.tap):
-            y += ( self.coef[j] * self.buf.get( self.tap - j ))
+            #y += ( self.coef[j] * self.buf.get( self.tap - j ))
+            
+            y += ( self.coef[j] * self.buf.get( tail ))
+
+            if tail >= ( self.tap - 1 ):
+                tail = 0
+            else:
+                tail = tail + 1
 
         return y
 
@@ -192,15 +215,33 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
+    FIR_TAPS = 16
+    #_fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, window="hamming", fs=SAMPLE_FREQ )
+    _fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, window="hamming", fs=SAMPLE_FREQ, pass_zero="lowpass" )
+
+    # The desired attenuation in the stop band, in dB.
+    ripple_db = 60.0
+
+    # The desired width of the transition from pass to stop,
+    # relative to the Nyquist rate.  We'll design the filter
+    # with a 5 Hz transition width.
+    width = 50.0/ (SAMPLE_FREQ / 2.0)
+
+    # Compute the order and Kaiser parameter for the FIR filter.
+    N, beta = kaiserord(ripple_db, width)
+
+    #_fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, fs=SAMPLE_FREQ,  window=('kaiser', beta))
+
     # Filter object
     _filter_FIR     = FIR( FIR_TAP_NUM, FIR_COEFFICIENT )
+    _filter_FIR_2   = FIR( FIR_TAPS, _fir_coef )
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
     _x_d = [0]
 
-    _y_fir = []
-    _time_fir = []
+    _y_d_fir = [0]
+    _y_d_fir_2 = [0]
 
     # Generate inputs
     _sin_x = []
@@ -212,7 +253,8 @@ if __name__ == "__main__":
     _d_time = [0]
     
     for n in range(SAMPLE_NUM):
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        #_sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ) + generate_sine( _time[n], 1500.0, 0.05, 0.0, 0.0 )  )  
         _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
  
     # Apply filter
@@ -231,43 +273,44 @@ if __name__ == "__main__":
             _d_time.append( _time[n])
             _x_d.append( _x[n] )
 
-            # LPF
-            _y_d_lpf_1.append( _filter_D_LPF_1.update( _x_d[-1] ) )
-            _y_d_lpf_2.append( _filter_D_LPF_2.update( _x_d[-1] ) )
-            _y_d_lpf_3.append( _filter_D_LPF_3.update( _x_d[-1] ) )
-
             # FIR 
-            _y_fir.append( _filter_FIR.update( _x[n] ) )
-            _time_fir.append( _time[n] )
+            _y_d_fir.append( _filter_FIR.update( _x[n] ) )
+            _y_d_fir_2.append( _filter_FIR_2.update( _x[n] ) )
         else:
             _downsamp_cnt += 1
     
     # Plot results
-    """
+    
     fig, ax = plt.subplots(2, 1)
     fig.suptitle("Input signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz", fontsize=20)
-    ax[0,0].plot( _time, _x, "b", label="Input-generated" )
-    ax[0,0].plot( _time, _y_lpf_1, "g", label="Ideal filter")
-    ax[0,0].plot( _d_time, _downsamp_samp, "r.", label="Sample points")
-    ax[0,0].plot( _time, _y_lpf_1, "g", label="RC1: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
-    ax[0,0].plot( _time, _y_lpf_2, "r", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
-    ax[0,0].plot( _time, _y_lpf_3, "y", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
-    ax[0,0].grid()
-    ax[0,0].title.set_text("RC Low Pass Filter - Ideal (fs=" + str( 1 / _dt ) + "Hz)")
-    ax[0,0].set_ylabel("Amplitude")
-    ax[0,0].legend(loc="upper right")
+    ax[0].plot( _time, _x,                  "b", label="Input-generated" )
+    ax[0].plot( _d_time, _downsamp_samp,    "r.", label="Sample points")
+    #ax[0].plot( _d_time, _y_d_fir,          "g", label="FIR")
+    ax[0].plot( _d_time, _y_d_fir_2,        "y", label="FIR2")
+    ax[0].grid()
+    #ax[0].title.set_text("RC Low Pass Filter - Ideal (fs=" + str( 1 / _dt ) + "Hz)")
+    ax[0].set_ylabel("Amplitude")
+    ax[0].legend(loc="upper right")
 
 
-    ax[0,1].plot( _d_time, _x_d, "b.-", label="Input-sampled")
-    ax[0,1].plot( _d_time, _y_d_lpf_1, "g.-", label="RC1: " + str(LPF_FC_1) + "Hz/" + str(LPF_ORDER_1))
-    ax[0,1].plot( _d_time, _y_d_lpf_2, "r.-", label="RC2: " + str(LPF_FC_2) + "Hz/" + str(LPF_ORDER_2))
-    ax[0,1].plot( _d_time, _y_d_lpf_3, "y.-", label="RC3: " + str(LPF_FC_3) + "Hz/" + str(LPF_ORDER_3))
-    ax[0,1].grid()
-    ax[0,1].title.set_text("RC Low Pass Filter - Real (fs=" + str(SAMPLE_FREQ) + "Hz)")
-    ax[0,1].legend(loc="upper right")
-    """
+    w, h = freqz( _fir_coef )
+
+    # Convert to Hz unit
+    w = ( w / np.pi * SAMPLE_FREQ / 2)
+
+    ax[1].plot(w, 20 * np.log10(abs(h)), 'b')
+    ax[1].set_ylabel('Amplitude [dB]', color='b')
+    ax[1].set_xlabel('Frequency [Hz]')
+    ax[1].grid()
+
+    ax_11 = ax[1].twinx()
+    angles = np.unwrap( np.angle(h) )
+    ax_11.plot(w, (angles*180/np.pi), 'g')
+    ax_11.set_ylabel('Angle [degrees]', color='g')
+    ax_11.axis('tight')
+
     
-    plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
+    #plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
 
     plt.show()
     
