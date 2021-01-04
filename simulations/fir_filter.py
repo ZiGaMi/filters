@@ -22,7 +22,7 @@ from scipy.signal import firwin, freqz, kaiserord
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 1000.0
+SAMPLE_FREQ = 2000.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -48,7 +48,7 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 10
+INPUT_SIGNAL_FREQ = 100
 
 
 
@@ -215,22 +215,10 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
-    FIR_TAPS = 16
+    FIR_TAPS = 8
     #_fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, window="hamming", fs=SAMPLE_FREQ )
-    _fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, window="hamming", fs=SAMPLE_FREQ, pass_zero="lowpass" )
-
-    # The desired attenuation in the stop band, in dB.
-    ripple_db = 60.0
-
-    # The desired width of the transition from pass to stop,
-    # relative to the Nyquist rate.  We'll design the filter
-    # with a 5 Hz transition width.
-    width = 50.0/ (SAMPLE_FREQ / 2.0)
-
-    # Compute the order and Kaiser parameter for the FIR filter.
-    N, beta = kaiserord(ripple_db, width)
-
-    #_fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, fs=SAMPLE_FREQ,  window=('kaiser', beta))
+    _fir_coef = firwin( numtaps=FIR_TAPS, cutoff=[0.01, 100], window="hamming", fs=SAMPLE_FREQ, pass_zero=False )
+    _fir_coef = FIR_COEFFICIENT
 
     # Filter object
     _filter_FIR     = FIR( FIR_TAP_NUM, FIR_COEFFICIENT )
@@ -253,8 +241,8 @@ if __name__ == "__main__":
     _d_time = [0]
     
     for n in range(SAMPLE_NUM):
-        #_sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ) + generate_sine( _time[n], 1500.0, 0.05, 0.0, 0.0 )  )  
+        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        #_sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ) + generate_sine( _time[n], 1500.0, 0.05, 0.0, 0.0 )  )  
         _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
  
     # Apply filter
@@ -309,7 +297,43 @@ if __name__ == "__main__":
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
 
-    
+
+    """
+    # Nyquist rate.
+    nyq_rate = SAMPLE_FREQ / 2
+
+    # Width of the roll-off region.
+    width = 500 / nyq_rate
+
+    # Attenuation in the stop band.
+    ripple_db = 12.0
+
+    num_of_taps, beta = kaiserord(ripple_db, width)
+    if num_of_taps % 2 == 0:
+        num_of_taps = num_of_taps + 1
+
+    # Cut-off frequency.
+    cutoff_hz = 5000.0
+
+    # Estimate the filter coefficients.
+    taps = firwin(num_of_taps, cutoff_hz/nyq_rate, window=('kaiser', beta), pass_zero=False)
+
+    w, h = freqz(taps, worN=4000)
+
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot((w/np.pi)*nyq_rate, 20*np.log10(np.abs(h)), linewidth=2)
+
+    ax.axvline(cutoff_hz + width*nyq_rate, linestyle='--', linewidth=1, color='g')
+    ax.axvline(cutoff_hz - width*nyq_rate, linestyle='--', linewidth=1, color='g')
+    ax.axhline(-ripple_db, linestyle='--', linewidth=1, color='c')
+    delta = 10**(-ripple_db/20)
+    ax.axhline(20*np.log10(1 + delta), linestyle='--', linewidth=1, color='r')
+    ax.axhline(20*np.log10(1 - delta), linestyle='--', linewidth=1, color='r')
+    ax.grid()
+    """
+
+
     #plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
 
     plt.show()
