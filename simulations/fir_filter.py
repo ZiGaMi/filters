@@ -3,7 +3,9 @@
 # @note:    This script is evaluation of FIR filter algorithm
 # @author:  Ziga Miklosic
 # @date:    02.01.2021
-# @brief:   Evaluation of FIR filter design
+# @brief:   Evaluation of FIR filter design. FIR1 filter coefficients are 
+#           calculated using firwin function while FIR2 filter coefficients
+#           are defined via webpage T-filter.
 # ===============================================================================
 
 # ===============================================================================
@@ -18,11 +20,13 @@ from scipy.signal import firwin, freqz, kaiserord
 #       CONSTANTS
 # ===============================================================================
 
+## ****** USER CONFIGURATIONS ******
+
 ## Sample frequency
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 2000.0
+SAMPLE_FREQ = 1000.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -48,9 +52,42 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 100
+INPUT_SIGNAL_FREQ = 50
 
+## Number of FIR taps
+FIR_TAP_NUM     = 8
+FIR_TAP_NUM_2   = 19
 
+## FIR cutoff frequency
+#
+#   Unit: Hz
+FIR_CUT_OFF     = 10.0
+
+# Coefficient calculated by T-filter web page
+# Link: http://t-filter.engineerjs.com/
+FIR_2_COEF = [
+    0.00983679251710613,
+    0.016906009403821313,
+    0.029012511729722044,
+    0.044185823706193596,
+    0.06146104679182853,
+    0.07937592793186861,
+    0.09611093303268682,
+    0.10977246099391554,
+    0.11872311326692045,
+    0.12184110110169752,
+    0.11872311326692045,
+    0.10977246099391554,
+    0.09611093303268682,
+    0.07937592793186861,
+    0.06146104679182853,
+    0.044185823706193596,
+    0.029012511729722044,
+    0.016906009403821313,
+    0.00983679251710613
+]
+
+## ****** END OF USER CONFIGURATIONS ******
 
 # ===============================================================================
 #       FUNCTIONS
@@ -110,7 +147,7 @@ def generate_rect(time, freq, amp, off, phase):
 #       CLASSES
 # ===============================================================================
 
-
+## Circular buffer
 class CircBuffer:
 
     def __init__(self, size):
@@ -143,6 +180,7 @@ class CircBuffer:
     def get_whole_buffer(self):
         return self.buf
 
+## FIR Filter
 class FIR:
 
     def __init__(self, tap, coef):
@@ -184,45 +222,24 @@ class FIR:
         return y
 
 
-
-
 # ===============================================================================
 #       MAIN ENTRY
 # ===============================================================================
-
-FIR_TAP_NUM = 16
-FIR_COEFFICIENT = [
-993.7115243977110590E-6,
- 0.011898750525239039,
- 0.026093294471711985,
- 0.048239818572596682,
- 0.074979302516632151,
- 0.102206493068131094,
- 0.124584980431458908,
- 0.137240329406428413,
- 0.137240329406428413,
- 0.124584980431458908,
- 0.102206493068131094,
- 0.074979302516632151,
- 0.048239818572596682,
- 0.026093294471711985,
- 0.011898750525239039,
- 993.7115243977110590E-6,
-]
-
 if __name__ == "__main__":
 
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
-    FIR_TAPS = 8
-    #_fir_coef = firwin( numtaps=FIR_TAPS, cutoff=10.0, window="hamming", fs=SAMPLE_FREQ )
-    _fir_coef = firwin( numtaps=FIR_TAPS, cutoff=[0.01, 100], window="hamming", fs=SAMPLE_FREQ, pass_zero=False )
-    _fir_coef = FIR_COEFFICIENT
+    # Calculate FIR coefficient
+    _fir_coef = firwin( numtaps=FIR_TAP_NUM, cutoff=FIR_CUT_OFF, window="hamming", fs=SAMPLE_FREQ )
+
+    # Calculate frequency characteristics 
+    w, h = freqz( _fir_coef )
+    w2, h2 = freqz( FIR_2_COEF )
 
     # Filter object
-    _filter_FIR     = FIR( FIR_TAP_NUM, FIR_COEFFICIENT )
-    _filter_FIR_2   = FIR( FIR_TAPS, _fir_coef )
+    _filter_FIR = FIR( FIR_TAP_NUM, _fir_coef )
+    _filter_FIR_2 = FIR( FIR_TAP_NUM_2, FIR_2_COEF )
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -242,7 +259,6 @@ if __name__ == "__main__":
     
     for n in range(SAMPLE_NUM):
         _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        #_sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ) + generate_sine( _time[n], 1500.0, 0.05, 0.0, 0.0 )  )  
         _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
  
     # Apply filter
@@ -250,7 +266,6 @@ if __name__ == "__main__":
         
         # Mux input signals
         _x[n] = input_signal_mux( INPUT_SIGNAL_SELECTION, _sin_x[n], _rect_x[n] )
-
 
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
@@ -268,73 +283,37 @@ if __name__ == "__main__":
             _downsamp_cnt += 1
     
     # Plot results
-    
     fig, ax = plt.subplots(2, 1)
-    fig.suptitle("Input signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz", fontsize=20)
+    fig.suptitle("FIR Filter\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
     ax[0].plot( _time, _x,                  "b", label="Input-generated" )
     ax[0].plot( _d_time, _downsamp_samp,    "r.", label="Sample points")
-    #ax[0].plot( _d_time, _y_d_fir,          "g", label="FIR")
-    ax[0].plot( _d_time, _y_d_fir_2,        "y", label="FIR2")
+    ax[0].plot( _d_time, _y_d_fir,          "g", label=str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
+    ax[0].plot( _d_time, _y_d_fir_2,        "y", label="xHz/" + str(FIR_TAP_NUM_2))
     ax[0].grid()
-    #ax[0].title.set_text("RC Low Pass Filter - Ideal (fs=" + str( 1 / _dt ) + "Hz)")
+    ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
     ax[0].legend(loc="upper right")
 
-
-    w, h = freqz( _fir_coef )
-
     # Convert to Hz unit
     w = ( w / np.pi * SAMPLE_FREQ / 2)
+    w2 = ( w2 / np.pi * SAMPLE_FREQ / 2)
 
-    ax[1].plot(w, 20 * np.log10(abs(h)), 'b')
+    ax[1].plot(w, 20 * np.log10(abs(h)), 'b', label=str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
+    ax[1].plot(w2, 20 * np.log10(abs(h2)), 'y', label="xHz/" + str(FIR_TAP_NUM_2))
     ax[1].set_ylabel('Amplitude [dB]', color='b')
     ax[1].set_xlabel('Frequency [Hz]')
     ax[1].grid()
+    ax[1].title.set_text("Amplitude and phase characteristics")
+    ax[1].legend(loc="upper right")
 
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
-    ax_11.plot(w, (angles*180/np.pi), 'g')
+    angles_2 = np.unwrap( np.angle(h2) )
+    ax_11.plot(w, (angles*180/np.pi), 'g', label="phase 1")
+    ax_11.plot(w2, (angles_2*180/np.pi), 'r', label="phase 2")
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
-
-
-    """
-    # Nyquist rate.
-    nyq_rate = SAMPLE_FREQ / 2
-
-    # Width of the roll-off region.
-    width = 500 / nyq_rate
-
-    # Attenuation in the stop band.
-    ripple_db = 12.0
-
-    num_of_taps, beta = kaiserord(ripple_db, width)
-    if num_of_taps % 2 == 0:
-        num_of_taps = num_of_taps + 1
-
-    # Cut-off frequency.
-    cutoff_hz = 5000.0
-
-    # Estimate the filter coefficients.
-    taps = firwin(num_of_taps, cutoff_hz/nyq_rate, window=('kaiser', beta), pass_zero=False)
-
-    w, h = freqz(taps, worN=4000)
-
-
-    fig, ax = plt.subplots(1, 1)
-    ax.plot((w/np.pi)*nyq_rate, 20*np.log10(np.abs(h)), linewidth=2)
-
-    ax.axvline(cutoff_hz + width*nyq_rate, linestyle='--', linewidth=1, color='g')
-    ax.axvline(cutoff_hz - width*nyq_rate, linestyle='--', linewidth=1, color='g')
-    ax.axhline(-ripple_db, linestyle='--', linewidth=1, color='c')
-    delta = 10**(-ripple_db/20)
-    ax.axhline(20*np.log10(1 + delta), linestyle='--', linewidth=1, color='r')
-    ax.axhline(20*np.log10(1 - delta), linestyle='--', linewidth=1, color='r')
-    ax.grid()
-    """
-
-
-    #plt.subplots_adjust(left=0.05, right=0.98, bottom=0.05, wspace=0.08)
+    ax_11.legend(loc="lower right")
 
     plt.show()
     
