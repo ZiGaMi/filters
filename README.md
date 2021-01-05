@@ -96,6 +96,18 @@ HPF_ORDER_3 = 3
 
 ![](simulations/pics/rc_filter_simulation_example.png)
 
+
+#### FIR filter simulations
+Similar to RC/CR filter simulation FIR filter has a list of configurations to be change according to simulation needs. It can be found at a top of a FIR filter simulator sript ***fir_filter.py***.
+
+Calling sript is identical as shown at a previous example.
+
+This script gives an example of ***firwin*** function usage to calculate FIR filter. Furthermore script has ability to simulate filters using externaly calculated FIR coefficient. For example from T-filter webpage ([link](http://t-filter.engineerjs.com/)).
+
+##### Example
+
+![](simulations/pics/fir_filter_simulation_example.png)
+
 #### Reading signal from CSV file
 For signals written in CSV file use ***filter_csv.py*** script with -f argument to select file to analyse. 
 
