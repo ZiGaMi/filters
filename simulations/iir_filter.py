@@ -211,7 +211,7 @@ if __name__ == "__main__":
     _z = .707
 
     # Cutoff frequency
-    _fc = 100.0
+    _fc = 10.0
 
     # Sample time
     _ts = 2 * np.tan( _fc / SAMPLE_FREQ * np.pi ) 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     _omega_b = 2 * _fc / SAMPLE_FREQ
 
     #b_b, a_b = butter( N=1, Wn=_omega_b, btype="lowpass", analog=False, fs=SAMPLE_FREQ )
-    b_b, a_b = butter( N=1, Wn=_fc, btype="highpass", analog=False, fs=SAMPLE_FREQ )
+    b_b, a_b = butter( N=2, Wn=_fc, btype="highpass", analog=False, fs=SAMPLE_FREQ )
 
     print("a: %s" % a)
     print("b: %s" % b)
@@ -317,6 +317,7 @@ if __name__ == "__main__":
     ax[1].set_xlabel('Frequency [Hz]')
     ax[1].grid()
     ax[1].title.set_text("Amplitude and phase characteristics")
+    ax[1].set_xscale("log")
     #ax[1].legend(loc="upper right")
 
     """

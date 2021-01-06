@@ -40,7 +40,7 @@ typedef struct filter_rc_s
 {
 	float32_t *	p_y;		/**<Output of filter + previous values */
 	float32_t	alpha;		/**<Filter smoothing factor */
-	uint8_t		order;		/**<Filter order */
+	uint8_t		order;		/**<Filter order - number of cascaded filter */
 } filter_rc_t;
 
 /**
@@ -51,7 +51,7 @@ typedef struct filter_cr_s
 	float32_t * p_y;		/**<Output of filter + previous values */
 	float32_t * p_x;		/**<Input of filter + previous values */
 	float32_t  	alpha;		/**<Filter smoothing factor */
-	uint8_t 	order;		/**<Filter order */
+	uint8_t 	order;		/**<Filter order - number of cascaded filter */
 } filter_cr_t;
 
 
@@ -71,10 +71,13 @@ typedef struct filter_cr_s
 /**
 *   Initialize RC filter
 *
+*@Note: Order of RC filter is represented as number of cascaded RC
+*		analog equivalent circuits!
+*
 * @param[in] 	p_filter	- Pointer to RC filter instance
 * @param[in] 	fc			- Filter cutoff frequency
 * @param[in] 	dt			- Sample time
-* @param[in] 	order		- Order of filter
+* @param[in] 	order		- Order of filter (number of cascaded filter)
 * @param[in] 	init_value	- Initial value
 * @return 		status		- Status of operation
 */
@@ -157,10 +160,13 @@ float32_t filter_rc_update(p_filter_rc_t filter_inst, const float32_t x)
 /**
 *   Initialize CR filter
 *
+*@Note: Order of CR filter is represented as number of cascaded CR
+*		analog equivalent circuits!
+*
 * @param[in] 	p_filter	- Pointer to CR filter instance
 * @param[in] 	fc			- Filter cutoff frequency
 * @param[in] 	dt			- Sample time
-* @param[in] 	order		- Order of filter
+* @param[in] 	order		- Order of filter (number of cascaded filter)
 * @return 		status		- Status of operation
 */
 ////////////////////////////////////////////////////////////////////////////////
