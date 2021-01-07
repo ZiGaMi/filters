@@ -50,7 +50,7 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 50
+INPUT_SIGNAL_FREQ = 5
 
 
 
@@ -178,7 +178,7 @@ class CircBuffer:
     """
     def get_time_ordered_samples(self):
 
-        _ordered = []
+        _ordered = [0.0]
         _start_idx = 0
 
         _start_idx = self.idx - 1
@@ -200,7 +200,7 @@ class CircBuffer:
 ## IIR Filter
 class IIR:
 
-    def __init__(self, a, b, order=1):
+    def __init__(self, a, b, order):
 
         # Store tap number and coefficient
         self.order = order
@@ -208,8 +208,8 @@ class IIR:
         self.b = b
 
         # Create circular buffer
-        self.x = CircBuffer(order)
-        self.y = CircBuffer(order)
+        self.x = CircBuffer(order+1)
+        self.y = CircBuffer(order+1)
 
 
     def update(self, x):
@@ -217,28 +217,20 @@ class IIR:
         # Fill input
         self.x.set( x )
 
-        """
-        # Get tail index of circ buffer
-        tail = self.x.get_tail()
+        # Get input/outputs history
+        _x = self.x.get_time_ordered_samples()
+        _y = self.y.get_time_ordered_samples()
 
-        # Offset by one
-        if tail >= ( self.order - 1 ):
-            tail = 0
-        else:
-            tail = tail + 1
+        # Calculate new value
+        y = 0.0
+        for j in range(self.order+1):
 
-        # Convolve
-        y = 0
-        for j in range(self.order + 1):
-            
-            y += ( self.coef[j] * self.x.get( tail ))
+            y += float(self.b[j] * _x[j])
 
-            if tail >= ( self.order - 1 ):
-                tail = 0
-            else:
-                tail = tail - 1
-        """
+            if j > 0:
+                y -= float(self.a[j] * _y[j])
 
+        #y = y * ( 1 / self.a[0] )
 
         # Fill output
         self.y.set(y)
@@ -257,7 +249,7 @@ if __name__ == "__main__":
     # Damping factor
     _z = 0.25
     _z_2 = 0.707
-    _z_3 = 1.75
+    _z_3 = 2.0
 
     # Cutoff frequency
     _fc = 5.0
@@ -280,15 +272,17 @@ if __name__ == "__main__":
     w_b, h_b = freqz( b_b, a_b, 2*4096 )
     
     
-    """
+    
     # Filter object
-    _filter_IIR = IIR( 2, a, b ) 
+    _filter_IIR     = IIR( a, b, order=2 ) 
+    _filter_IIR_2   = IIR( a_b, b_b, order=2 ) 
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
     _x_d = [0]
 
     _y_d_iir = [0]
+    _y_d_iir_2 = [0]
 
     # Generate inputs
     _sin_x = []
@@ -320,27 +314,28 @@ if __name__ == "__main__":
 
             # IIR 
             _y_d_iir.append( _filter_IIR.update( _x[n] ))
+            _y_d_iir_2.append( _filter_IIR_2.update( _x[n] ))
 
         else:
             _downsamp_cnt += 1
     
-    """
+    
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
     fig.suptitle("IIR Filter\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
     
-    """
-    ax[0].plot( _time, _x,                  "b", label="Input-generated" )
-    ax[0].plot( _d_time, _downsamp_samp,    "r.", label="Sample points")
-    ax[0].plot( _d_time, _y_d_iir,          "g" )
+    
+    ax[0].plot( _time, _x,                  "b",    label="Input-generated" )
+    ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
+    ax[0].plot( _d_time, _y_d_iir,          "g",    label="IIR1" )
+    ax[0].plot( _d_time, _y_d_iir_2,        "y",    label="IIR2" )
     ax[0].grid()
     ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
     ax[0].legend(loc="upper right")
+    ax[0].set_ylim(-20,20)
 
-
-    """
 
     
     # Convert to Hz unit
@@ -363,6 +358,7 @@ if __name__ == "__main__":
     ax[1].legend(loc="upper right")
 
     """
+    
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
     angles_b = np.unwrap( np.angle(h_b) )
@@ -371,14 +367,11 @@ if __name__ == "__main__":
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
     #ax_11.legend(loc="lower right")
+
     """
 
-    my_buf = CircBuffer(4)
-    my_buf.get_time_ordered_samples()
-    my_buf.set(1)
-    my_buf.get_time_ordered_samples()
 
-    #plt.show()
+    plt.show()
     
 
 
