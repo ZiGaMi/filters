@@ -111,6 +111,37 @@ def generate_rect(time, freq, amp, off, phase):
 
 
 # ===============================================================================
+# @brief:   calculate 2nd order high pass filter based on following 
+#           transfer function:
+#           
+#               h(s) = s^2 / ( s^2 + z*s + 1 )
+#
+# @param[in]:    fc     - Corner frequenc
+# @param[in]:    z      - Damping factor
+# @param[in]:    fs     - Sample frequency
+# @return:       b,a    - Array of b,a IIR coefficients
+# ===============================================================================
+def calculate_2nd_order_HPF_coeff(fc, z, fs):
+    
+    _ts = 2 * np.tan( _fc / SAMPLE_FREQ * np.pi ) 
+    
+    # Calculate coefficient
+    # NOTE: This for of coefficient is result of bi-linear transform
+    a2 = ( _ts**2 / 4 ) - ( _ts/2 * z ) + 1
+    a1 = ( _ts**2 / 2 ) - 2
+    a0 = ( _ts**2 / 4 ) + ( _ts/2 * z ) + 1
+    b2 = 1
+    b1 = -2
+    b0 = 1
+
+    # Fill array
+    a = [ a0, a1, a2 ] 
+    b = [ b0, b1, b2 ] 
+
+    return b, a
+
+
+# ===============================================================================
 #       CLASSES
 # ===============================================================================
 
@@ -140,9 +171,28 @@ class CircBuffer:
             return self.buf[idx]
         else:
             raise AssertionError
-    
-    def get_tail(self):
-        return self.idx
+
+    """
+        Returns array of time sorted samples in buffer
+        [ n, n-1, n-2, ... n - size - 1 ]
+    """
+    def get_time_ordered_samples(self):
+
+        _ordered = []
+        _start_idx = 0
+
+        _start_idx = self.idx - 1
+        if _start_idx < 0:
+            _start_idx += self.size
+
+        # Sort samples per time
+        for n in range( self.size ):
+            _last_idx = _start_idx - n
+            if _last_idx < 0:
+                _last_idx += self.size 
+            _ordered.append( self.buf[ _last_idx ] )
+
+        return _ordered
 
     def get_whole_buffer(self):
         return self.buf
@@ -204,35 +254,19 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
-    # Natural frequency
-    _w = 1.0
-
     # Damping factor
-    _z = .707
+    _z = 0.25
+    _z_2 = 0.707
+    _z_3 = 1.75
 
     # Cutoff frequency
-    _fc = 10.0
-
-    # Sample time
-    _ts = 2 * np.tan( _fc / SAMPLE_FREQ * np.pi ) 
+    _fc = 5.0
 
     # Calculate frequency characteristics 
-    a2 = ( _ts**2 *_w**2 / 4 ) - ( _ts/2 * _z * _w ) + 1
-    a1 = ( _ts**2 * _w**2 / 2 ) - 2
-    a0 = ( _ts**2 *_w**2 / 4 ) + ( _ts/2 * _z * _w ) + 1
-    
-    b2 = 1
-    b1 = -2
-    b0 = 1
-    
-    a = [ a0, a1, a2 ] 
-    b = [ b0, b1, b2 ] 
+    b, a            = calculate_2nd_order_HPF_coeff( _fc, _z, SAMPLE_FREQ )
+    b_2, a_2        = calculate_2nd_order_HPF_coeff( _fc, _z_2, SAMPLE_FREQ )
+    b_3, a_3        = calculate_2nd_order_HPF_coeff( _fc, _z_3, SAMPLE_FREQ )
 
-
-   
-    _omega_b = 2 * _fc / SAMPLE_FREQ
-
-    #b_b, a_b = butter( N=1, Wn=_omega_b, btype="lowpass", analog=False, fs=SAMPLE_FREQ )
     b_b, a_b = butter( N=2, Wn=_fc, btype="highpass", analog=False, fs=SAMPLE_FREQ )
 
     print("a: %s" % a)
@@ -240,8 +274,10 @@ if __name__ == "__main__":
     print("a_b: %s" % a_b)
     print("b_b: %s" % b_b)
 
-    w, h = freqz( b, a, 4096 )
-    w_b, h_b = freqz( b_b, a_b, 4096 )
+    w, h = freqz( b, a, 2*4096 )
+    w_2, h_2 = freqz( b_2, a_2, 2*4096 )
+    w_3, h_3 = freqz( b_3, a_3, 2*4096 )
+    w_b, h_b = freqz( b_b, a_b, 2*4096 )
     
     
     """
@@ -309,16 +345,22 @@ if __name__ == "__main__":
     
     # Convert to Hz unit
     w = ( w / np.pi * SAMPLE_FREQ / 2)
+    w_2 = ( w_2 / np.pi * SAMPLE_FREQ / 2)
+    w_3 = ( w_3 / np.pi * SAMPLE_FREQ / 2)
     w_b = ( w_b / np.pi * SAMPLE_FREQ / 2)
 
-    ax[1].plot(w, 20 * np.log10(abs(h)), 'b')
-    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'g')
-    ax[1].set_ylabel('Amplitude [dB]', color='b')
+    ax[1].plot(w,   20 * np.log10(abs(h)), 'b', label=str(_fc) + "Hz/" + str(_z))
+    ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'g', label=str(_fc) + "Hz/" + str(_z_2))
+    ax[1].plot(w_3, 20 * np.log10(abs(h_3)), 'y', label=str(_fc) + "Hz/" + str(_z_3))
+    
+    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="bessel 2nd order" )
+    
+    ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
     ax[1].grid()
     ax[1].title.set_text("Amplitude and phase characteristics")
     ax[1].set_xscale("log")
-    #ax[1].legend(loc="upper right")
+    ax[1].legend(loc="upper right")
 
     """
     ax_11 = ax[1].twinx()
@@ -330,9 +372,13 @@ if __name__ == "__main__":
     ax_11.axis('tight')
     #ax_11.legend(loc="lower right")
     """
-    
 
-    plt.show()
+    my_buf = CircBuffer(4)
+    my_buf.get_time_ordered_samples()
+    my_buf.set(1)
+    my_buf.get_time_ordered_samples()
+
+    #plt.show()
     
 
 
