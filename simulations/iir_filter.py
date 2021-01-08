@@ -12,7 +12,7 @@
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import freqz, butter, cheby1
+from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt
 
 # ===============================================================================
 #       CONSTANTS
@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 2.5
+TIME_WINDOW = 2
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -50,7 +50,7 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 5
+INPUT_SIGNAL_FREQ = 10
 
 
 
@@ -178,7 +178,7 @@ class CircBuffer:
     """
     def get_time_ordered_samples(self):
 
-        _ordered = [0.0]
+        _ordered = [0.0] * self.size
         _start_idx = 0
 
         _start_idx = self.idx - 1
@@ -190,7 +190,7 @@ class CircBuffer:
             _last_idx = _start_idx - n
             if _last_idx < 0:
                 _last_idx += self.size 
-            _ordered.append( self.buf[ _last_idx ] )
+            _ordered[n] = self.buf[_last_idx]
 
         return _ordered
 
@@ -215,7 +215,7 @@ class IIR:
     def update(self, x):
         
         # Fill input
-        self.x.set( x )
+        self.x.set(float( x ))
 
         # Get input/outputs history
         _x = self.x.get_time_ordered_samples()
@@ -225,12 +225,12 @@ class IIR:
         y = 0.0
         for j in range(self.order+1):
 
-            y += float(self.b[j] * _x[j])
+            y = y + float(float(self.b[j]) * _x[j])
 
             if j > 0:
-                y -= float(self.a[j] * _y[j])
+                y = y - float(float(self.a[j]) * _y[j-1])
 
-        #y = y * ( 1 / self.a[0] )
+        y = float( y * ( 1 / float(self.a[0] )))
 
         # Fill output
         self.y.set(y)
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     _z_3 = 2.0
 
     # Cutoff frequency
-    _fc = 5.0
+    _fc = 10.0
 
     # Calculate frequency characteristics 
     b, a            = calculate_2nd_order_HPF_coeff( _fc, _z, SAMPLE_FREQ )
@@ -283,6 +283,8 @@ if __name__ == "__main__":
 
     _y_d_iir = [0]
     _y_d_iir_2 = [0]
+
+
 
     # Generate inputs
     _sin_x = []
@@ -319,7 +321,11 @@ if __name__ == "__main__":
         else:
             _downsamp_cnt += 1
     
+        #_y_d_bessel = lfilter( b_b, a_b, )
+    #zi = signal.lfilter_zi(b_b, a_b)
+    #z, _ = signal.lfilter(b_b, a_b, _x, zi=zi*_x[0])
     
+    __y = lfilter(b, a, _x_d)
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
@@ -330,11 +336,12 @@ if __name__ == "__main__":
     ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax[0].plot( _d_time, _y_d_iir,          "g",    label="IIR1" )
     ax[0].plot( _d_time, _y_d_iir_2,        "y",    label="IIR2" )
+    #ax[0].plot( _d_time, __y,               "y",    label="bessel" )
     ax[0].grid()
     ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
     ax[0].legend(loc="upper right")
-    ax[0].set_ylim(-20,20)
+    #ax[0].set_ylim(-20,20)
 
 
     
@@ -348,7 +355,7 @@ if __name__ == "__main__":
     ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'g', label=str(_fc) + "Hz/" + str(_z_2))
     ax[1].plot(w_3, 20 * np.log10(abs(h_3)), 'y', label=str(_fc) + "Hz/" + str(_z_3))
     
-    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="bessel 2nd order" )
+    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butter 2nd order" )
     
     ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
@@ -357,18 +364,17 @@ if __name__ == "__main__":
     ax[1].set_xscale("log")
     ax[1].legend(loc="upper right")
 
-    """
     
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
     angles_b = np.unwrap( np.angle(h_b) )
     ax_11.plot(w, (angles*180/np.pi), 'b')
-    ax_11.plot(w_b, (angles_b*180/np.pi), 'g')
+    ax_11.plot(w_b, (angles_b*180/np.pi), 'r', label="butter 2nd order")
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
-    #ax_11.legend(loc="lower right")
+    ax_11.legend(loc="lower right")
 
-    """
+    
 
 
     plt.show()
