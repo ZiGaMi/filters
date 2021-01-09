@@ -162,7 +162,8 @@ loop @SAMPLE_TIME
  - [x] Evaluation of CR filter in python
  - [x] Implementation of RC filter in C   
  - [x] Implementation of CR filter in C   
- - [ ] Evaluation of FIR filter in python   
+ - [x] Evaluation of FIR filter in python   
+ - [x] Evaluation of IIR filter (LPF, HPF, notch) in python   
  - [ ] Implementation of FIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
