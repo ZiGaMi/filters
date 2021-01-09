@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 2
+TIME_WINDOW = 1
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -50,8 +50,23 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 10
+INPUT_SIGNAL_FREQ = 10.0
 
+## Cutoff freqeuncy of filter
+#
+# Unit: Hz
+HPF_FC_1 = 10.0
+HPF_FC_2 = 10.0
+HPF_FC_BUTTER = 10.0
+HPF_FC_CHEBY = 10.0
+
+## Damping factor (zeta) for 2nd order filter
+#
+#   z = 0       -> underdamped
+#   z = 0.7071  -> criticaly damped, sweep spot
+#   z = 1       -> overdamped
+HPF_Z_1 = .25
+HPF_Z_2 = 1.75
 
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -123,7 +138,7 @@ def generate_rect(time, freq, amp, off, phase):
 # ===============================================================================
 def calculate_2nd_order_HPF_coeff(fc, z, fs):
     
-    _ts = 2 * np.tan( _fc / SAMPLE_FREQ * np.pi ) 
+    _ts = 2 * np.tan( fc / SAMPLE_FREQ * np.pi ) 
     
     # Calculate coefficient
     # NOTE: This for of coefficient is result of bi-linear transform
@@ -194,6 +209,12 @@ class CircBuffer:
 
         return _ordered
 
+    def get_tail(self):
+        return self.idx
+
+    def get_size(self):
+        return self.size
+
     def get_whole_buffer(self):
         return self.buf
 
@@ -246,36 +267,23 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
-    # Damping factor
-    _z = 0.25
-    _z_2 = 0.707
-    _z_3 = 2.0
+    # Calculate coefficient for 2nd order HPF
+    b, a        = calculate_2nd_order_HPF_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
+    b_2, a_2    = calculate_2nd_order_HPF_coeff( HPF_FC_2, HPF_Z_2, SAMPLE_FREQ )
 
-    # Cutoff frequency
-    _fc = 10.0
+    # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
+    b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
+    b_c, a_c = cheby1( N=2, Wn=HPF_FC_CHEBY, btype="highpass", analog=False, fs=SAMPLE_FREQ, rp=0.99 )
 
-    # Calculate frequency characteristics 
-    b, a            = calculate_2nd_order_HPF_coeff( _fc, _z, SAMPLE_FREQ )
-    b_2, a_2        = calculate_2nd_order_HPF_coeff( _fc, _z_2, SAMPLE_FREQ )
-    b_3, a_3        = calculate_2nd_order_HPF_coeff( _fc, _z_3, SAMPLE_FREQ )
-
-    b_b, a_b = butter( N=2, Wn=_fc, btype="highpass", analog=False, fs=SAMPLE_FREQ )
-
-    print("a: %s" % a)
-    print("b: %s" % b)
-    print("a_b: %s" % a_b)
-    print("b_b: %s" % b_b)
-
-    w, h = freqz( b, a, 2*4096 )
-    w_2, h_2 = freqz( b_2, a_2, 2*4096 )
-    w_3, h_3 = freqz( b_3, a_3, 2*4096 )
-    w_b, h_b = freqz( b_b, a_b, 2*4096 )
-    
-    
+    # Get frequency characteristics
+    w, h = freqz( b, a, 4096 )
+    w_2, h_2 = freqz( b_2, a_2, 4096 )
+    w_b, h_b = freqz( b_b, a_b, 4096 )
+    w_c, h_c = freqz( b_c, a_c, 4096 )
     
     # Filter object
     _filter_IIR     = IIR( a, b, order=2 ) 
-    _filter_IIR_2   = IIR( a_b, b_b, order=2 ) 
+    _filter_IIR_2   = IIR( a_2, b_2, order=2 ) 
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -283,8 +291,6 @@ if __name__ == "__main__":
 
     _y_d_iir = [0]
     _y_d_iir_2 = [0]
-
-
 
     # Generate inputs
     _sin_x = []
@@ -321,41 +327,35 @@ if __name__ == "__main__":
         else:
             _downsamp_cnt += 1
     
-        #_y_d_bessel = lfilter( b_b, a_b, )
-    #zi = signal.lfilter_zi(b_b, a_b)
-    #z, _ = signal.lfilter(b_b, a_b, _x, zi=zi*_x[0])
-    
-    __y = lfilter(b, a, _x_d)
+    # Apply filter on signal
+    #__y = lfilter(b, a, _x_d)
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
-    fig.suptitle("IIR Filter\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
-    
+    fig.suptitle("Highpass 2nd order IIR Filter Design\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
     
     ax[0].plot( _time, _x,                  "b",    label="Input-generated" )
     ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
-    ax[0].plot( _d_time, _y_d_iir,          "g",    label="IIR1" )
-    ax[0].plot( _d_time, _y_d_iir_2,        "y",    label="IIR2" )
-    #ax[0].plot( _d_time, __y,               "y",    label="bessel" )
+    ax[0].plot( _d_time, _y_d_iir,          ".-g",    label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
+    ax[0].plot( _d_time, _y_d_iir_2,        ".-y",    label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
     ax[0].grid()
     ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
     ax[0].legend(loc="upper right")
-    #ax[0].set_ylim(-20,20)
-
 
     
     # Convert to Hz unit
     w = ( w / np.pi * SAMPLE_FREQ / 2)
     w_2 = ( w_2 / np.pi * SAMPLE_FREQ / 2)
-    w_3 = ( w_3 / np.pi * SAMPLE_FREQ / 2)
-    w_b = ( w_b / np.pi * SAMPLE_FREQ / 2)
 
-    ax[1].plot(w,   20 * np.log10(abs(h)), 'b', label=str(_fc) + "Hz/" + str(_z))
-    ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'g', label=str(_fc) + "Hz/" + str(_z_2))
-    ax[1].plot(w_3, 20 * np.log10(abs(h_3)), 'y', label=str(_fc) + "Hz/" + str(_z_3))
+    w_b = ( w_b / np.pi * SAMPLE_FREQ / 2)
+    w_c = ( w_c / np.pi * SAMPLE_FREQ / 2)
+
+    ax[1].plot(w,   20 * np.log10(abs(h)),   'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
+    ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
     
-    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butter 2nd order" )
+    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butterworth" )
+    ax[1].plot(w_c, 20 * np.log10(abs(h_c)), 'b', label="chebysev" )
     
     ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
@@ -363,19 +363,16 @@ if __name__ == "__main__":
     ax[1].title.set_text("Amplitude and phase characteristics")
     ax[1].set_xscale("log")
     ax[1].legend(loc="upper right")
-
     
+    """
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
     angles_b = np.unwrap( np.angle(h_b) )
     ax_11.plot(w, (angles*180/np.pi), 'b')
-    ax_11.plot(w_b, (angles_b*180/np.pi), 'r', label="butter 2nd order")
+    ax_11.plot(w_b, (angles_b*180/np.pi), 'r')
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
-    ax_11.legend(loc="lower right")
-
-    
-
+    """
 
     plt.show()
     
