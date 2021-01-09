@@ -24,7 +24,7 @@ from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt, bilinear
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 200.0
+SAMPLE_FREQ = 1000.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 3
+TIME_WINDOW = 6
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -55,11 +55,11 @@ INPUT_SIGNAL_FREQ = 1.0
 ## Cutoff freqeuncy of filter
 #
 # Unit: Hz
-HPF_FC_1 = 10.0
-HPF_FC_2 = 10.0
+HPF_FC_1 = 1.0
+HPF_FC_2 = 1.0
 
-HPF_FC_BUTTER = 10.0
-HPF_FC_CHEBY = 10.0
+HPF_FC_BUTTER = 1.0
+HPF_FC_CHEBY = 1.0
 
 LPF_FC_1 = 1.0
 LPF_FC_2 = 1.0
@@ -72,10 +72,10 @@ LPF_FC_CHEBY = 1.0
 #   z = 0       -> underdamped
 #   z = 0.7071  -> criticaly damped, sweep spot
 #   z = 1       -> overdamped
-HPF_Z_1 = .25
+HPF_Z_1 = .5
 HPF_Z_2 = 1.75
 
-LPF_Z_1 = .25
+LPF_Z_1 = .5
 LPF_Z_2 = 1.75
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -138,7 +138,7 @@ def generate_rect(time, freq, amp, off, phase):
 # @brief:   calculate 2nd order high pass filter based on following 
 #           transfer function:
 #           
-#               h(s) = s^2 / ( s^2 + z*w*s + w^2 )
+#               h(s) = s^2 / ( s^2 + z*w*s + w^2 )  --- bilinear ---> h(z)
 #
 # @param[in]:    fc     - Corner frequenc
 # @param[in]:    z      - Damping factor
@@ -147,20 +147,11 @@ def generate_rect(time, freq, amp, off, phase):
 # ===============================================================================
 def calculate_2nd_order_HPF_coeff(fc, z, fs):
     
-    _ts = 2 * np.tan( fc / SAMPLE_FREQ * np.pi ) 
-    
-    # Calculate coefficient
-    # NOTE: This for of coefficient is result of bi-linear transform
-    a2 = ( _ts**2 / 4 ) - ( _ts/2 * z ) + 1
-    a1 = ( _ts**2 / 2 ) - 2
-    a0 = ( _ts**2 / 4 ) + ( _ts/2 * z ) + 1
-    b2 = 1
-    b1 = -2
-    b0 = 1
+    # Calculate omega
+    w = 2*np.pi*fc
 
-    # Fill array
-    a = [ a0, a1, a2 ] 
-    b = [ b0, b1, b2 ] 
+    # Make bilinear transformation
+    b, a = bilinear( [1,0,0], [1,z*w,w**2], fs )
 
     return b, a
 
@@ -168,7 +159,7 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
 # @brief:   calculate 2nd order low pass filter based on following 
 #           transfer function:
 #           
-#               h(s) = w^2 / ( s^2 + z*w*s + w^2 )
+#               h(s) = w^2 / ( s^2 + z*w*s + w^2 ) --- bilinear ---> h(z)
 #
 # @param[in]:    fc     - Corner frequenc
 # @param[in]:    z      - Damping factor
@@ -181,7 +172,7 @@ def calculate_2nd_order_LPF_coeff(fc, z, fs):
     w = 2*np.pi*fc
 
     # Using bilinear transformation
-    b, a = bilinear([0,0,w**2], [1,z*w,w**2], fs )
+    b, a = bilinear( [0,0,w**2], [1,z*w,w**2], fs )
 
     return b, a
 
@@ -366,9 +357,7 @@ if __name__ == "__main__":
     _filter_IIR_2   = IIR( a_2, b_2, order=2 ) 
 
     _filter_IIR_LPF   = IIR( lpf_a, lpf_b, order=2 ) 
-    #_filter_IIR_LPF_2 = IIR( lpf_a_2, lpf_b_2, order=2 ) 
-    _filter_IIR_LPF_2 = IIR( a_b_lpf, b_b_lpf, order=2 ) 
-
+    _filter_IIR_LPF_2 = IIR( lpf_a_2, lpf_b_2, order=2 ) 
 
     _filter_IIR_NOTCH = IIR( notch_a, notch_b, order=2 ) 
     _filter_IIR_NOTCH_2 = IIR( notch_a_2, notch_b_2, order=2 ) 
@@ -439,7 +428,7 @@ if __name__ == "__main__":
             _downsamp_cnt += 1
     
     # Apply filter on signal
-    __y = lfilter(lpf_b, lpf_a, _x_d)
+    #__y = lfilter(lpf_b, lpf_a, _x_d)
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
@@ -449,12 +438,15 @@ if __name__ == "__main__":
     ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax[0].plot( _d_time, _y_d_iir,          ".-g",    label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
     ax[0].plot( _d_time, _y_d_iir_2,        ".-y",    label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
+    
+    ax[0].set_ylabel('Amplitude')
+    ax[0].set_xlabel('Time [s]')
     ax[0].grid()
     ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
     ax[0].legend(loc="upper right")
+    ax[0].set_ylabel("Amplitude")
 
-    
     # Convert to Hz unit
     w = ( w / np.pi * SAMPLE_FREQ / 2)
     w_2 = ( w_2 / np.pi * SAMPLE_FREQ / 2)
@@ -475,6 +467,7 @@ if __name__ == "__main__":
     ax[1].set_xscale("log")
     ax[1].legend(loc="upper right")
     
+    # uncomment if neede phase delay
     """
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
@@ -492,12 +485,13 @@ if __name__ == "__main__":
     ax2[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax2[0].plot( _d_time, _y_d_iir_lpf,      ".-g",  label=str(LPF_FC_1) + "Hz/" + str(LPF_Z_1))
     ax2[0].plot( _d_time, _y_d_iir_lpf_2,    ".-y",  label=str(LPF_FC_2) + "Hz/" + str(LPF_Z_2))
-    ax2[0].plot( _d_time, __y,                ".-k",  label="butter")
+    
+    ax2[0].set_ylabel('Amplitude')
+    ax2[0].set_xlabel('Time [s]')
     ax2[0].grid()
     ax2[0].title.set_text("Time domain")
     ax2[0].set_ylabel("Amplitude")
     ax2[0].legend(loc="upper right")
-    ax2[0].set_ylim(-5, 5)
 
     w_b_lpf = ( w_b_lpf / np.pi * SAMPLE_FREQ / 2)
     w_c_lpf = ( w_c_lpf / np.pi * SAMPLE_FREQ / 2)
@@ -507,9 +501,11 @@ if __name__ == "__main__":
 
     ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)),       'g', label=str(LPF_FC_1) + "Hz/" + str(LPF_Z_1) )
     ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)),   'y', label=str(LPF_FC_2) + "Hz/" + str(LPF_Z_2) )
-    ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)), 'r', label="butterworth" )
-    ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)), 'b', label="chebysev" )
+    ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)),   'r', label="butterworth" )
+    ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)),   'b', label="chebysev" )
 
+    ax2[1].set_ylabel('Amplitude [dB]')
+    ax2[1].set_xlabel('Frequency [Hz]')
     ax2[1].grid()
     ax2[1].set_ylim(-80, 20)
     ax2[1].set_xlim(0.001, SAMPLE_FREQ/4)
@@ -528,12 +524,17 @@ if __name__ == "__main__":
     ax3[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax3[0].plot( _d_time, _y_d_iir_notch,    ".-g",  label="notch1")
     #ax3[0].plot( _d_time, _y_d_iir_notch_2,  ".-y",  label="notch2")
+    
+    ax3[0].set_ylabel('Amplitude')
+    ax3[0].set_xlabel('Time [s]')
     ax3[0].grid()
     ax3[0].legend(loc="upper right")
 
     ax3[1].plot(w_notch, 20 * np.log10(abs(h_notch)),  'g')
     ax3[1].plot(w_notch_2, 20 * np.log10(abs(h_notch_2)),  'r')
 
+    ax3[1].set_ylabel('Amplitude [dB]')
+    ax3[1].set_xlabel('Frequency [Hz]')
     ax3[1].grid()
     #ax3[1].set_ylim(-80, 20)
     #ax3[1].set_xlim(0.001, SAMPLE_FREQ/4)
