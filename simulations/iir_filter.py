@@ -24,7 +24,7 @@ from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 1000.0
+SAMPLE_FREQ = 2000.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -57,8 +57,12 @@ INPUT_SIGNAL_FREQ = 10.0
 # Unit: Hz
 HPF_FC_1 = 10.0
 HPF_FC_2 = 10.0
+
 HPF_FC_BUTTER = 10.0
 HPF_FC_CHEBY = 10.0
+
+LPF_FC_1 = 10.0
+LPF_FC_2 = 10.0
 
 ## Damping factor (zeta) for 2nd order filter
 #
@@ -68,6 +72,8 @@ HPF_FC_CHEBY = 10.0
 HPF_Z_1 = .25
 HPF_Z_2 = 1.75
 
+LPF_Z_1 = .25
+LPF_Z_2 = 1.75
 
 ## ****** END OF USER CONFIGURATIONS ******
 
@@ -129,7 +135,7 @@ def generate_rect(time, freq, amp, off, phase):
 # @brief:   calculate 2nd order high pass filter based on following 
 #           transfer function:
 #           
-#               h(s) = s^2 / ( s^2 + z*s + 1 )
+#               h(s) = s^2 / ( s^2 + z*w*s + w^2 )
 #
 # @param[in]:    fc     - Corner frequenc
 # @param[in]:    z      - Damping factor
@@ -147,6 +153,36 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
     a0 = ( _ts**2 / 4 ) + ( _ts/2 * z ) + 1
     b2 = 1
     b1 = -2
+    b0 = 1
+
+    # Fill array
+    a = [ a0, a1, a2 ] 
+    b = [ b0, b1, b2 ] 
+
+    return b, a
+
+# ===============================================================================
+# @brief:   calculate 2nd order low pass filter based on following 
+#           transfer function:
+#           
+#               h(s) = w^2 / ( s^2 + z*w*s + w^2 )
+#
+# @param[in]:    fc     - Corner frequenc
+# @param[in]:    z      - Damping factor
+# @param[in]:    fs     - Sample frequency
+# @return:       b,a    - Array of b,a IIR coefficients
+# ===============================================================================
+def calculate_2nd_order_LPF_coeff(fc, z, fs):
+    
+    _ts = 2 * np.tan( fc / SAMPLE_FREQ * np.pi ) 
+    
+    # Calculate coefficient
+    # NOTE: This for of coefficient is result of bi-linear transform
+    a2 = ( 4 / (_ts**2)) + ( 2 * z / _ts ) + 1
+    a1 = ( -8 / (_ts**2)) + 2
+    a0 = ( 4 / (_ts**2)) - ( 2 * z / _ts ) + 1
+    b2 = 1
+    b1 = 2
     b0 = 1
 
     # Fill array
@@ -236,7 +272,7 @@ class IIR:
     def update(self, x):
         
         # Fill input
-        self.x.set(float( x ))
+        self.x.set( x )
 
         # Get input/outputs history
         _x = self.x.get_time_ordered_samples()
@@ -246,12 +282,12 @@ class IIR:
         y = 0.0
         for j in range(self.order+1):
 
-            y = y + float(float(self.b[j]) * _x[j])
+            y = y + (self.b[j] * _x[j])
 
             if j > 0:
-                y = y - float(float(self.a[j]) * _y[j-1])
+                y = y - (self.a[j] * _y[j-1])
 
-        y = float( y * ( 1 / float(self.a[0] )))
+        y = ( y * ( 1 / self.a[0] ))
 
         # Fill output
         self.y.set(y)
@@ -270,6 +306,10 @@ if __name__ == "__main__":
     # Calculate coefficient for 2nd order HPF
     b, a        = calculate_2nd_order_HPF_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
     b_2, a_2    = calculate_2nd_order_HPF_coeff( HPF_FC_2, HPF_Z_2, SAMPLE_FREQ )
+    
+    # Calculate coefficient for 2nd order LPF
+    lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
+    lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
     b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
@@ -278,8 +318,12 @@ if __name__ == "__main__":
     # Get frequency characteristics
     w, h = freqz( b, a, 4096 )
     w_2, h_2 = freqz( b_2, a_2, 4096 )
+    
     w_b, h_b = freqz( b_b, a_b, 4096 )
     w_c, h_c = freqz( b_c, a_c, 4096 )
+    
+    w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
+    w_lpf_2, h_lpf_2 = freqz( lpf_b_2, lpf_a_2, 4096 )
     
     # Filter object
     _filter_IIR     = IIR( a, b, order=2 ) 
@@ -350,12 +394,17 @@ if __name__ == "__main__":
 
     w_b = ( w_b / np.pi * SAMPLE_FREQ / 2)
     w_c = ( w_c / np.pi * SAMPLE_FREQ / 2)
+    
+    w_lpf = ( w_lpf / np.pi * SAMPLE_FREQ / 2)
+    w_lpf_2 = ( w_lpf_2 / np.pi * SAMPLE_FREQ / 2)
 
     ax[1].plot(w,   20 * np.log10(abs(h)),   'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
     ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
     
     ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butterworth" )
     ax[1].plot(w_c, 20 * np.log10(abs(h_c)), 'b', label="chebysev" )
+    
+
     
     ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
@@ -373,6 +422,13 @@ if __name__ == "__main__":
     ax_11.set_ylabel('Angle [degrees]', color='g')
     ax_11.axis('tight')
     """
+
+    fig2, ax2 = plt.subplots(2, 1)
+
+    ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)), 'k' )
+    ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)), 'k' )
+
+    ax2[1].set_xscale("log")
 
     plt.show()
     
