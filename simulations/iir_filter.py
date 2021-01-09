@@ -24,7 +24,7 @@ from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 2000.0
+SAMPLE_FREQ = 200.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 1
+TIME_WINDOW = 3
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -50,7 +50,7 @@ INPUT_SIGNAL_SELECTION = INPUT_SINE
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 10.0
+INPUT_SIGNAL_FREQ = 1.0
 
 ## Cutoff freqeuncy of filter
 #
@@ -61,8 +61,11 @@ HPF_FC_2 = 10.0
 HPF_FC_BUTTER = 10.0
 HPF_FC_CHEBY = 10.0
 
-LPF_FC_1 = 10.0
-LPF_FC_2 = 10.0
+LPF_FC_1 = 1.0
+LPF_FC_2 = 1.0
+
+LPF_FC_BUTTER = 1.0
+LPF_FC_CHEBY = 1.0
 
 ## Damping factor (zeta) for 2nd order filter
 #
@@ -72,7 +75,7 @@ LPF_FC_2 = 10.0
 HPF_Z_1 = .25
 HPF_Z_2 = 1.75
 
-LPF_Z_1 = .25
+LPF_Z_1 = 1.0
 LPF_Z_2 = 1.75
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -165,7 +168,7 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
 # @brief:   calculate 2nd order low pass filter based on following 
 #           transfer function:
 #           
-#               h(s) = w^2 / ( s^2 + z*w*s + w^2 )
+#               h(s) = w / ( s^2 + z*w*s + w^2 )
 #
 # @param[in]:    fc     - Corner frequenc
 # @param[in]:    z      - Damping factor
@@ -180,11 +183,53 @@ def calculate_2nd_order_LPF_coeff(fc, z, fs):
     # NOTE: This for of coefficient is result of bi-linear transform
     a2 = ( 4 / (_ts**2)) + ( 2 * z / _ts ) + 1
     a1 = ( -8 / (_ts**2)) + 2
-    a0 = ( 4 / (_ts**2)) - ( 2 * z / _ts ) + 1
+    a0 = ( 4 / (_ts**2)) - ( 2 * z / _ts ) + 1    
+    
     b2 = 1
     b1 = 2
     b0 = 1
+    
 
+    # From iowa webpage: http://www.iowahills.com/A4IIRBilinearTransform.html
+    """
+    a2 = (-2 * z * _ts) + 4 + (_ts**2)
+    a1 = (2 * _ts**2) - 8
+    a0 = 4 + (_ts**2) + (2*z*_ts)
+
+    b2 = _ts
+    b1 = 2*(_ts**2)
+    b0 = 4*(_ts**2)
+    """
+
+    # Fill array
+    a = [ a0, a1, a2 ] 
+    b = [ b0, b1, b2 ] 
+
+    return b, a
+
+
+# ===============================================================================
+# @brief:   calculate 2nd order notch filter. This code is from 
+#           "Second-order IIR Notch Filter Design and implementation of digital
+#           signal processing system" acticle
+#
+# @param[in]:    fc     - Corner frequenc
+# @param[in]:    fs     - Sample frequency
+# @return:       b,a    - Array of b,a IIR coefficients
+# ===============================================================================
+def calculate_2nd_order_notch_coeff(fc, fs, r):
+   
+    _w = 2 * np.pi * fc / fs
+
+    # Calculate coefficient
+    a2 = r*r
+    a1 = -2*r*np.cos( _w ) 
+    a0 = 1
+    
+    b2 = 1
+    b1 = -2*np.cos( _w )
+    b0 = 1
+    
     # Fill array
     a = [ a0, a1, a2 ] 
     b = [ b0, b1, b2 ] 
@@ -311,9 +356,16 @@ if __name__ == "__main__":
     lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
     lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
+    # Calculate coefficient for 2nd order notch filter
+    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.925 )
+    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.90 )
+
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
     b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
     b_c, a_c = cheby1( N=2, Wn=HPF_FC_CHEBY, btype="highpass", analog=False, fs=SAMPLE_FREQ, rp=0.99 )
+
+    b_b_lpf, a_b_lpf = butter( N=2, Wn=LPF_FC_BUTTER, btype="lowpass", analog=False, fs=SAMPLE_FREQ )
+    b_c_lpf, a_c_lpf = cheby1( N=2, Wn=LPF_FC_CHEBY, btype="lowpass", analog=False, fs=SAMPLE_FREQ, rp=0.99 )
 
     # Get frequency characteristics
     w, h = freqz( b, a, 4096 )
@@ -321,13 +373,32 @@ if __name__ == "__main__":
     
     w_b, h_b = freqz( b_b, a_b, 4096 )
     w_c, h_c = freqz( b_c, a_c, 4096 )
+
+    w_b_lpf, h_b_lpf = freqz( b_b_lpf, a_b_lpf, 4096 )
+    w_c_lpf, h_c_lpf = freqz( b_c_lpf, a_c_lpf, 4096 )
     
     w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
     w_lpf_2, h_lpf_2 = freqz( lpf_b_2, lpf_a_2, 4096 )
+
+    w_notch, h_notch = freqz( notch_b, notch_a, 4096 )
+    w_notch_2, h_notch_2 = freqz( notch_b_2, notch_a_2, 4096 )
     
     # Filter object
     _filter_IIR     = IIR( a, b, order=2 ) 
     _filter_IIR_2   = IIR( a_2, b_2, order=2 ) 
+
+    _filter_IIR_LPF   = IIR( lpf_a, lpf_b, order=2 ) 
+    #_filter_IIR_LPF_2 = IIR( lpf_a_2, lpf_b_2, order=2 ) 
+    _filter_IIR_LPF_2 = IIR( a_b_lpf, b_b_lpf, order=2 ) 
+
+
+    _filter_IIR_NOTCH = IIR( notch_a, notch_b, order=2 ) 
+    _filter_IIR_NOTCH_2 = IIR( notch_a_2, notch_b_2, order=2 ) 
+
+    print("lpf_a: %s" % lpf_a)
+    print("lpf_b: %s" % lpf_b)
+    print("a_b_lpf: %s" % a_b_lpf)
+    print("b_b_lpf: %s" % b_b_lpf)
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -336,9 +407,17 @@ if __name__ == "__main__":
     _y_d_iir = [0]
     _y_d_iir_2 = [0]
 
+    _y_d_iir_lpf = [0]
+    _y_d_iir_lpf_2 = [0]
+    
+    _y_d_iir_notch = [0]
+    _y_d_iir_notch_2 = [0]
+
     # Generate inputs
     _sin_x = []
     _rect_x = []
+
+    _ac_power_noise = []
 
     # Down sample
     _downsamp_cnt = 0
@@ -347,7 +426,9 @@ if __name__ == "__main__":
     
     for n in range(SAMPLE_NUM):
         _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 )) 
+        
+        _ac_power_noise.append( _sin_x[-1] +  generate_sine( _time[n], 50.0, 0.05, 0.0, 0.0 ) )
  
     # Apply filter
     for n in range(SAMPLE_NUM):
@@ -364,15 +445,23 @@ if __name__ == "__main__":
             _d_time.append( _time[n])
             _x_d.append( _x[n] )
 
-            # IIR 
+            # HPF
             _y_d_iir.append( _filter_IIR.update( _x[n] ))
             _y_d_iir_2.append( _filter_IIR_2.update( _x[n] ))
+
+            # LPF
+            _y_d_iir_lpf.append( _filter_IIR_LPF.update( _x[n] ))
+            _y_d_iir_lpf_2.append( _filter_IIR_LPF_2.update( _x[n] ))
+
+            # Notch 
+            _y_d_iir_notch.append( _filter_IIR_NOTCH.update( _ac_power_noise[n] ))
+            _y_d_iir_notch_2.append( _filter_IIR_NOTCH_2.update( _ac_power_noise[n] ))
 
         else:
             _downsamp_cnt += 1
     
     # Apply filter on signal
-    #__y = lfilter(b, a, _x_d)
+    __y = lfilter(lpf_b, lpf_a, _x_d)
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
@@ -394,17 +483,12 @@ if __name__ == "__main__":
 
     w_b = ( w_b / np.pi * SAMPLE_FREQ / 2)
     w_c = ( w_c / np.pi * SAMPLE_FREQ / 2)
-    
-    w_lpf = ( w_lpf / np.pi * SAMPLE_FREQ / 2)
-    w_lpf_2 = ( w_lpf_2 / np.pi * SAMPLE_FREQ / 2)
 
     ax[1].plot(w,   20 * np.log10(abs(h)),   'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
     ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
     
     ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butterworth" )
     ax[1].plot(w_c, 20 * np.log10(abs(h_c)), 'b', label="chebysev" )
-    
-
     
     ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
@@ -424,11 +508,59 @@ if __name__ == "__main__":
     """
 
     fig2, ax2 = plt.subplots(2, 1)
+    fig2.suptitle("Lowpass 2nd order IIR Filter Design\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
+    
+    ax2[0].plot( _time, _x,                  "b",    label="Input-generated" )
+    ax2[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
+    ax2[0].plot( _d_time, _y_d_iir_lpf,      ".-g",  label=str(LPF_FC_1) + "Hz/" + str(LPF_Z_1))
+    ax2[0].plot( _d_time, _y_d_iir_lpf_2,    ".-y",  label=str(LPF_FC_2) + "Hz/" + str(LPF_Z_2))
+    ax2[0].plot( _d_time, __y,                ".-k",  label="butter")
+    ax2[0].grid()
+    ax2[0].title.set_text("Time domain")
+    ax2[0].set_ylabel("Amplitude")
+    ax2[0].legend(loc="upper right")
+    ax2[0].set_ylim(-5, 5)
 
-    ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)), 'k' )
-    ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)), 'k' )
+    w_b_lpf = ( w_b_lpf / np.pi * SAMPLE_FREQ / 2)
+    w_c_lpf = ( w_c_lpf / np.pi * SAMPLE_FREQ / 2)
+    
+    w_lpf = ( w_lpf / np.pi * SAMPLE_FREQ / 2)
+    w_lpf_2 = ( w_lpf_2 / np.pi * SAMPLE_FREQ / 2)
 
+    ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)),       'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1) )
+    ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)),   'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2) )
+    ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)), 'r', label="butterworth" )
+    ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)), 'b', label="chebysev" )
+
+    ax2[1].grid()
+    ax2[1].set_ylim(-80, 20)
+    ax2[1].set_xlim(0.001, SAMPLE_FREQ/4)
     ax2[1].set_xscale("log")
+    ax2[1].legend(loc="upper right")
+
+
+    fig3, ax3 = plt.subplots(2, 1)
+    fig3.suptitle("Notch 2nd order IIR Filter Design\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
+   
+    w_notch = ( w_notch / np.pi * SAMPLE_FREQ / 2)
+    w_notch_2 = ( w_notch_2 / np.pi * SAMPLE_FREQ / 2)
+
+
+    ax3[0].plot( _time, _ac_power_noise,     "b",    label="Input-generated" )
+    ax3[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
+    ax3[0].plot( _d_time, _y_d_iir_notch,    ".-g",  label="notch1")
+    #ax3[0].plot( _d_time, _y_d_iir_notch_2,  ".-y",  label="notch2")
+    ax3[0].grid()
+    ax3[0].legend(loc="upper right")
+
+    ax3[1].plot(w_notch, 20 * np.log10(abs(h_notch)),  'g')
+    ax3[1].plot(w_notch_2, 20 * np.log10(abs(h_notch_2)),  'r')
+
+    ax3[1].grid()
+    #ax3[1].set_ylim(-80, 20)
+    #ax3[1].set_xlim(0.001, SAMPLE_FREQ/4)
+    ax3[1].set_xscale("log")
+    ax3[1].legend(loc="upper right")
 
     plt.show()
     
