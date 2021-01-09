@@ -12,7 +12,7 @@
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt
+from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt, bilinear
 
 # ===============================================================================
 #       CONSTANTS
@@ -75,7 +75,7 @@ LPF_FC_CHEBY = 1.0
 HPF_Z_1 = .25
 HPF_Z_2 = 1.75
 
-LPF_Z_1 = 1.0
+LPF_Z_1 = .25
 LPF_Z_2 = 1.75
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -168,7 +168,7 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
 # @brief:   calculate 2nd order low pass filter based on following 
 #           transfer function:
 #           
-#               h(s) = w / ( s^2 + z*w*s + w^2 )
+#               h(s) = w^2 / ( s^2 + z*w*s + w^2 )
 #
 # @param[in]:    fc     - Corner frequenc
 # @param[in]:    z      - Damping factor
@@ -176,34 +176,12 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
 # @return:       b,a    - Array of b,a IIR coefficients
 # ===============================================================================
 def calculate_2nd_order_LPF_coeff(fc, z, fs):
-    
-    _ts = 2 * np.tan( fc / SAMPLE_FREQ * np.pi ) 
-    
-    # Calculate coefficient
-    # NOTE: This for of coefficient is result of bi-linear transform
-    a2 = ( 4 / (_ts**2)) + ( 2 * z / _ts ) + 1
-    a1 = ( -8 / (_ts**2)) + 2
-    a0 = ( 4 / (_ts**2)) - ( 2 * z / _ts ) + 1    
-    
-    b2 = 1
-    b1 = 2
-    b0 = 1
-    
 
-    # From iowa webpage: http://www.iowahills.com/A4IIRBilinearTransform.html
-    """
-    a2 = (-2 * z * _ts) + 4 + (_ts**2)
-    a1 = (2 * _ts**2) - 8
-    a0 = 4 + (_ts**2) + (2*z*_ts)
+    # Calculate omega
+    w = 2*np.pi*fc
 
-    b2 = _ts
-    b1 = 2*(_ts**2)
-    b0 = 4*(_ts**2)
-    """
-
-    # Fill array
-    a = [ a0, a1, a2 ] 
-    b = [ b0, b1, b2 ] 
+    # Using bilinear transformation
+    b, a = bilinear([0,0,w**2], [1,z*w,w**2], fs )
 
     return b, a
 
@@ -428,7 +406,7 @@ if __name__ == "__main__":
         _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
         _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 )) 
         
-        _ac_power_noise.append( _sin_x[-1] +  generate_sine( _time[n], 50.0, 0.05, 0.0, 0.0 ) )
+        _ac_power_noise.append( _sin_x[-1] +  generate_sine( _time[n], 50.0, 0.15, 0.0, 0.0 ) )
  
     # Apply filter
     for n in range(SAMPLE_NUM):
@@ -527,8 +505,8 @@ if __name__ == "__main__":
     w_lpf = ( w_lpf / np.pi * SAMPLE_FREQ / 2)
     w_lpf_2 = ( w_lpf_2 / np.pi * SAMPLE_FREQ / 2)
 
-    ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)),       'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1) )
-    ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)),   'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2) )
+    ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)),       'g', label=str(LPF_FC_1) + "Hz/" + str(LPF_Z_1) )
+    ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)),   'y', label=str(LPF_FC_2) + "Hz/" + str(LPF_Z_2) )
     ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)), 'r', label="butterworth" )
     ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)), 'b', label="chebysev" )
 
