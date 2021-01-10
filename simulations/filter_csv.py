@@ -16,55 +16,40 @@ import argparse
 from scipy.fft import rfft, rfftfreq
 import numpy as np
 
-from rc_filter import RC_LPF, RC_HPF
+from rc_filter import RC_LPF, CR_HPF
 
 # ===============================================================================
 #       CONSTANTS
 # ===============================================================================
-
-# Sample time of input file
-SAMPLE_TIME = 0.01
-
 
 # ===============================================================================
 #       FUNCTIONS
 # ===============================================================================
 
 # ===============================================================================
-# @brief: Input signal mux
-#
-# @param[in]:    sel     - Multiplexor selector  
-# @param[in]:    in_1    - Input 1 
-# @param[in]:    in_2    - Input 2 
-# @return:       Either in_1 or in_2
-# ===============================================================================
-
-
-
-# ===============================================================================
 #       CLASSES
 # ===============================================================================
-
-
 
 # ===============================================================================
 #       MAIN ENTRY
 # ===============================================================================
 
-
-
 # Arg parser
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser( 	description="This script is for evaluation of filtering raw data from CSV file", 
+									epilog="Enjoy the program!\n")
 
-# File to plot
-parser.add_argument("-f", "--file", help="File for analysis")
+# Add arguments
+parser.add_argument("-f", "--file",			help="file to analyze", 						type=str, 	required=True)
+parser.add_argument("-fs", "--sample_freq",	help="sample time in Hz", 						type=float, required=True)
+parser.add_argument("-fc", "--cutoff_freq",	help="cutoff freq in Hz", 						type=float, required=True)
+parser.add_argument("-fl", "--filter", 		help="type of filter. Options: 'RC', 'CR'", 	type=str, 	required=True)
+parser.add_argument("-or", "--order", 		help="order of filter", 						type=int, 	required=True)
 
 # Get args
 args = parser.parse_args()
 
 # Convert namespace to dict
 args = vars(args)
-
 
 if __name__ == "__main__":
 
@@ -77,19 +62,22 @@ if __name__ == "__main__":
 	# Number of samples
 	_n = 0
 
+	# Sample frequecy & time
+	_fs = args["sample_freq"]
+	_ts = 1 / _fs
+
 	# Signal
 	_signal = []
 	_signal_filter = []
-	_signal_filter_1 = []
 
-	# RC LPF
-	_rc_lpf = RC_LPF( 40.0, SAMPLE_TIME, 2 )
-	_rc_lpf_1 = RC_LPF( 50.0, SAMPLE_TIME, 3 )
+	# Filter
+	if args["filter"] == "RC":
+		_filter = RC_LPF( args["cutoff_freq"], _ts, args["order"] )
+	elif args["filter"] == "CR":
+		_filter = CR_HPF( args["cutoff_freq"], _ts, args["order"] )
+	else:
+		raise AssertionError
 
-	# RC HPF
-	_rc_hpf = RC_HPF( 10.0, SAMPLE_TIME, 2 )
-	_rc_hpf_1 = RC_HPF( 20.0, SAMPLE_TIME, 3 )
-	
 	# Check for file
 	if args["file"] != None:
 		
@@ -110,23 +98,16 @@ if __name__ == "__main__":
 				# Ignore first row
 				if idx > 0:
                 	
-					_time.append( _time[-1] + SAMPLE_TIME )
+					_time.append( _time[-1] + _ts )
 					_signal.append( float(row[0]) + 1.0 )
 
-					# This is LPF
-					#_signal_filter.append( _rc_lpf.update( _signal[-1] ) )
-					#_signal_filter_1.append( _rc_lpf_1.update( _signal[-1] ) )
+					# Apply filter
+					_signal_filter.append( _filter.update( _signal[-1] ) )
 
-					# This is HPF
-					_signal_filter.append( _rc_hpf.update( _signal[-1] ) )
-					_signal_filter_1.append( _rc_hpf_1.update( _signal[-1] ) )
 				else:
 					_time.append( 0.0 )
 					_signal.append( 0.0 )
-
-					#_signal_filter.append( 0.0 )
-					_signal_filter.append( 1.0 )
-					_signal_filter_1.append( 0.0 )
+					_signal_filter.append( 0.0 )
 
 				# Sample number
 				_n = _n + 1
@@ -139,20 +120,19 @@ if __name__ == "__main__":
 
 	_signal_fft = rfft( _signal )
 	_signal_filter_fft = rfft( _signal_filter )
-	_signal_filter_1_fft = rfft( _signal_filter_1 )
-	_freq = rfftfreq( _n, SAMPLE_TIME )
+	_freq = rfftfreq( _n, _ts )
 
 	## ================================================================================
 	## PLOT DATA
     ## ================================================================================
 	fig, (ax_1, ax_2) = plt.subplots(2, 1)
 
-	fig.suptitle("Import file: " + str(_file), fontsize=20)
+	fig.suptitle("Import file: " + str(_file) + "\nFilter type: " + str(args["filter"]) + "\nfs: " + str(_fs) + "Hz, fc: " + str(args["cutoff_freq"]) + \
+				"Hz, order: " + str(args["order"]), fontsize=20)
 
 	ax_1.title.set_text("Time domain")
 	ax_1.plot( _time, _signal, 			"g", label="raw" )
-	ax_1.plot( _time, _signal_filter, 	"b", label="lpf" )
-	ax_1.plot( _time, _signal_filter_1,	"r", label="lpf1" )
+	ax_1.plot( _time, _signal_filter, 	"b", label="filtered" )
 	ax_1.grid()
 	ax_1.legend(loc="upper right")
 	ax_1.set_xlabel("Time [s]")
@@ -160,8 +140,7 @@ if __name__ == "__main__":
 
 	ax_2.title.set_text("Frequency domain")
 	ax_2.plot( _freq, np.abs(_signal_fft), 			"g", label="raw" )
-	ax_2.plot( _freq, np.abs(_signal_filter_fft), 	"b", label="lpf" )
-	ax_2.plot( _freq, np.abs(_signal_filter_1_fft), "r", label="lpf1" )
+	ax_2.plot( _freq, np.abs(_signal_filter_fft), 	"b", label="filtered" )
 	ax_2.grid()
 	ax_2.legend(loc="upper right")
 	ax_2.set_xlabel("Freuqncy [Hz]")

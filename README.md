@@ -121,19 +121,45 @@ Notch filter is specialy designed to filter AC freuqency of 50Hz. Base input sig
 
 
 #### Reading signal from CSV file
-For signals written in CSV file use ***filter_csv.py*** script with -f argument to select file to analyse. 
+Analysing raw signals store in CSV file can be done via ***filter_csv.py*** script. For help invoke with -h argument.
+
+NOTE: For know only RC and CR filter can be used with thin script! Additional constrain for know is that sript only intake first row of CSV table. This will be fixed in future!
 
 ```python
-# Example of invocation from console
->>>py filter_csv.py -f ..\..\test_data\steward_imu_roll_pitch_full_range_1_0Hz.csv
+>>>py filter_csv.py -h
+usage: filter_csv.py [-h] -f FILE -fs SAMPLE_FREQ -fc CUTOFF_FREQ -fl FILTER -or ORDER
+
+This script is for evaluation of filtering raw data from CSV file
+
+optional arguments:
+  -h, --help                                    show this help message and exit
+  -f FILE, --file FILE                          file to analyze
+  -fs SAMPLE_FREQ, --sample_freq SAMPLE_FREQ    sample time in Hz
+  -fc CUTOFF_FREQ, --cutoff_freq CUTOFF_FREQ    cutoff freq in Hz
+  -fl FILTER, --filter FILTER                   type of filter. Options: 'RC', 'CR'
+  -or ORDER, --order ORDER                      order of filter
+
+Enjoy the program!
 ```
 
 In simulations signal is being shown in time and frequency domain. By inspecting frequency signature of raw signal cutoff frequency of selected filter can be easily determine. 
 
 ##### Example of accelerometer data filtering
+
+```python
+# Example of invocation from console
+# Input file: steward_imu_roll_pitch_full_range_1_0Hz.csv
+# Cutoff freq: 12.0 Hz
+# Sample freq: 100.0 Hz
+# Filter: RC
+# Order: 3 (number of cascaded RC blocks)
+>>>py filter_csv.py -f ..\..\test_data\steward_imu_roll_pitch_full_range_1_0Hz.csv -fc 12.0 -fs 100.0 -fl "RC" -or 3
+```
+
+
 This example shows signal acquire from accelerometer and RC low pass filter in work. Upper picture shows raw and filtered signals in time domain and bottom shows same signals in frequency domain.
 
-![](simulations/pics/filter_analysis_example.png)
+![](simulations/pics/filter_analysis_example_2.png)
 
 
 ## C implementation
@@ -176,10 +202,12 @@ loop @SAMPLE_TIME
  - [x] Implementation of CR filter in C   
  - [x] Evaluation of FIR filter in python   
  - [x] Evaluation of IIR filter (LPF, HPF, notch) in python   
+ - [x] Make filter_csv.py configurable via argparse
+ - [ ] Add row selection to filter_csv.py
  - [ ] Implementation of FIR filter in C   
  - [ ] Implementation of IIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
- - [ ] Make filter_csv.py configurable via argparse
+
 
     
