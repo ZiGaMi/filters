@@ -158,10 +158,9 @@ def calculate_2nd_order_notch_coeff(fc, fs, r):
 
     return b, a
 
-
 # ===============================================================================
 #       CLASSES
-# ===============================================================================
+# ===============================================================================    
 
 ## IIR Filter
 class IIR:
@@ -327,9 +326,6 @@ if __name__ == "__main__":
 
         else:
             _downsamp_cnt += 1
-    
-    # Apply filter on signal
-    #__y = lfilter(lpf_b, lpf_a, _x_d)
     
     # Plot results
     fig, ax = plt.subplots(2, 1)

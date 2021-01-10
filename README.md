@@ -2,12 +2,16 @@
 
 This repository contains simulations in Python using Matplotlib and C implementation tested on STM32 platfrom. All filters evaluated in simulations are realized in C for general embedded application use. 
 
+RC/CR filter C implementation support also cascading filter but user shall notice that cascading two RC or CR filters does not have same characteristics as IIR 2nd order filter. To define 2nd order IIR filter beside cutoff frequency (fc) also damping factors ($\zeta$) must be defined.
+
+For both FIR and IIR C implementation filters coefficients must be defined at initialization time and are subject to application needs. C functions are prepared only to intake filter coefficient and therefore user shall use externla tools to evaluate appropriate filter for application and to acquire it's coefficients. Although 2nd order LPF, HPF and notch filter coefficients can be obtain from ***iir_filter.py*** script under /simulation directory. Similar to IIR filter, FIR filter coefficient can be calcualted with ***fir_filter.py*** script, with none or small changes applied.
+
 
 ## List of all filters
- - RC filter (LPF)
- - CR filter (HPF)
+ - RC filter (IIR 1st order LPF)
+ - CR filter (IIR 1st order HPF)
  - FIR
-
+ - IIR
 
 ## Simulations
 
@@ -42,20 +46,13 @@ IDEAL_SAMPLE_FREQ = 20000.0
 # Unit: second
 TIME_WINDOW = 2.5
 
-## Number of samples in time window
-SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
-
-## Select input filter signal type
-INPUT_SINE = 0
-INPUT_RECT = 1
-
 ## Input signal shape
 INPUT_SIGNAL_AMPLITUDE = 1.0
 INPUT_SIGNAL_OFFSET = 0.0
 INPUT_SIGNAL_PHASE = 0.0
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_SINE
+INPUT_SIGNAL_SELECTION = SignalMux.MUX_CTRL_SINE
 
 ## Input signal frequency
 #
@@ -107,6 +104,21 @@ This script gives an example of ***firwin*** function usage to calculate FIR fil
 ##### Example
 
 ![](simulations/pics/fir_filter_simulation_example.png)
+
+#### IIR filter simulations
+Invocation and configuration of script is identical to RC/CR and FIR simulations. All examples bellow are described in ***iir_filter.py***.
+
+##### 2nd order LPF
+![](simulations/pics/iir_lpf_2nd_order_filter_simulation_example.png)
+
+##### 2nd order HPF
+![](simulations/pics/iir_hpf_2nd_order_filter_simulation_example.png)
+
+##### 2nd order notch
+Notch filter is specialy designed to filter AC freuqency of 50Hz. Base input signal is 1Hz with added AC noise.
+![](simulations/pics/notch_filter_simulation_example.png)
+
+
 
 #### Reading signal from CSV file
 For signals written in CSV file use ***filter_csv.py*** script with -f argument to select file to analyse. 
@@ -165,6 +177,7 @@ loop @SAMPLE_TIME
  - [x] Evaluation of FIR filter in python   
  - [x] Evaluation of IIR filter (LPF, HPF, notch) in python   
  - [ ] Implementation of FIR filter in C   
+ - [ ] Implementation of IIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
  - [ ] Make filter_csv.py configurable via argparse
