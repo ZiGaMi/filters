@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import firwin, freqz, kaiserord
 
+from filter_utils import FunctionGenerator, SignalMux, CircBuffer
+
 # ===============================================================================
 #       CONSTANTS
 # ===============================================================================
@@ -37,22 +39,23 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 2.5
+TIME_WINDOW = .5
 
-## Number of samples in time window
-SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
-
-## Select input filter signal type
-INPUT_SINE = 0
-INPUT_RECT = 1
+## Input signal shape
+INPUT_SIGNAL_AMPLITUDE = 1.0
+INPUT_SIGNAL_OFFSET = 0.0
+INPUT_SIGNAL_PHASE = 0.0
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_SINE
+INPUT_SIGNAL_SELECTION = SignalMux.MUX_CTRL_SINE
 
 ## Input signal frequency
 #
 # Unit: Hz
 INPUT_SIGNAL_FREQ = 50
+
+## Number of samples in time window
+SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 
 ## Number of FIR taps
 FIR_TAP_NUM     = 8
@@ -62,6 +65,7 @@ FIR_TAP_NUM_2   = 19
 #
 #   Unit: Hz
 FIR_CUT_OFF     = 10.0
+FIR_CUT_OFF_2   = "x.x"
 
 # Coefficient calculated by T-filter web page
 # Link: http://t-filter.engineerjs.com/
@@ -90,95 +94,8 @@ FIR_2_COEF = [
 ## ****** END OF USER CONFIGURATIONS ******
 
 # ===============================================================================
-#       FUNCTIONS
-# ===============================================================================
-
-# ===============================================================================
-# @brief: Input signal mux
-#
-# @param[in]:    sel     - Multiplexor selector  
-# @param[in]:    in_1    - Input 1 
-# @param[in]:    in_2    - Input 2 
-# @return:       Either in_1 or in_2
-# ===============================================================================
-def input_signal_mux(sel, in_1, in_2):
-    if ( INPUT_SINE == sel ):
-        return in_1
-    elif ( INPUT_RECT == sel ):
-        return in_2
-    else:
-        pass
-
-# ===============================================================================
-# @brief: Generate sine as injected signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of sine
-# @param[in]:    off     - DC offset of sine
-# @param[in]:    phase   - Phase of sine
-# @return:       Generated signal
-# ===============================================================================
-def generate_sine(time, freq, amp, off, phase):
-    return (( amp * np.sin((2*np.pi*freq*time) + phase )) + off )
-
-
-# ===============================================================================
-# @brief: Generate rectangle signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of rectange
-# @param[in]:    off     - DC offset of rectangle
-# @param[in]:    phase   - Phase of rectangle
-# @return:       Generated signal
-# ===============================================================================
-def generate_rect(time, freq, amp, off, phase):
-    _carier = generate_sine(time, freq, 1.0, 0.0, phase)
-    _sig = 0
-
-    if ( _carier > 0 ):
-        _sig = amp + off
-    else:
-        _sig = off
-
-    return _sig 
-
-
-# ===============================================================================
 #       CLASSES
 # ===============================================================================
-
-## Circular buffer
-class CircBuffer:
-
-    def __init__(self, size):
-        self.buf = [0.0] * size
-        self.idx = 0
-        self.size = size
-    
-    def __manage_index(self):
-        if self.idx >= (self.size - 1):
-            self.idx = 0
-        else:
-            self.idx = self.idx + 1
-
-    def set(self, val):
-        if self.idx < self.size:
-            self.buf[self.idx] = val
-            self.__manage_index()
-        else:
-            raise AssertionError
-
-    def get(self, idx):
-        if idx < self.size:
-            return self.buf[idx]
-        else:
-            raise AssertionError
-    
-    def get_tail(self):
-        return self.idx
-
-    def get_whole_buffer(self):
-        return self.buf
 
 ## FIR Filter
 class FIR:
@@ -210,8 +127,7 @@ class FIR:
         # Convolve
         y = 0
         for j in range(self.tap):
-            #y += ( self.coef[j] * self.buf.get( self.tap - j ))
-            
+
             y += ( self.coef[j] * self.buf.get( tail ))
 
             if tail >= ( self.tap - 1 ):
@@ -249,23 +165,30 @@ if __name__ == "__main__":
     _y_d_fir_2 = [0]
 
     # Generate inputs
+    _fg_sine = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "sine" )
+    _fg_rect = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "rect" )
     _sin_x = []
     _rect_x = []
+
+    # Signal mux
+    # NOTE: Support only sine and rectange
+    _signa_mux = SignalMux( 2 )
 
     # Down sample
     _downsamp_cnt = 0
     _downsamp_samp = [0]
     _d_time = [0]
     
+    # Generate stimuli signals
     for n in range(SAMPLE_NUM):
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
+        _sin_x.append( _fg_sine.generate( _time[n] ))
+        _rect_x.append( _fg_rect.generate( _time[n] ))
  
     # Apply filter
     for n in range(SAMPLE_NUM):
         
         # Mux input signals
-        _x[n] = input_signal_mux( INPUT_SIGNAL_SELECTION, _sin_x[n], _rect_x[n] )
+        _x[n] = _signa_mux.out( INPUT_SIGNAL_SELECTION, [ _sin_x[n], _rect_x[n] ] )
 
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
@@ -282,25 +205,27 @@ if __name__ == "__main__":
         else:
             _downsamp_cnt += 1
     
+    
     # Plot results
     fig, ax = plt.subplots(2, 1)
     fig.suptitle("FIR Filter\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
     ax[0].plot( _time, _x,                  "b", label="Input-generated" )
     ax[0].plot( _d_time, _downsamp_samp,    "r.", label="Sample points")
-    ax[0].plot( _d_time, _y_d_fir,          "g", label=str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
-    ax[0].plot( _d_time, _y_d_fir_2,        "y", label="xHz/" + str(FIR_TAP_NUM_2))
+    ax[0].plot( _d_time, _y_d_fir,          ".-g", label=str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
+    ax[0].plot( _d_time, _y_d_fir_2,        ".-y", label=str(FIR_CUT_OFF_2) + "Hz/" + str(FIR_TAP_NUM_2))
     ax[0].grid()
     ax[0].title.set_text("Time domain")
     ax[0].set_ylabel("Amplitude")
+    ax[0].set_xlabel("Time [s]")
     ax[0].legend(loc="upper right")
 
     # Convert to Hz unit
     w = ( w / np.pi * SAMPLE_FREQ / 2)
     w2 = ( w2 / np.pi * SAMPLE_FREQ / 2)
 
-    ax[1].plot(w, 20 * np.log10(abs(h)), 'b', label=str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
-    ax[1].plot(w2, 20 * np.log10(abs(h2)), 'y', label="xHz/" + str(FIR_TAP_NUM_2))
-    ax[1].set_ylabel('Amplitude [dB]', color='b')
+    ax[1].plot(w, 20 * np.log10(abs(h)),    'g', label="FIR1: " + str(FIR_CUT_OFF) + "Hz/" + str(FIR_TAP_NUM))
+    ax[1].plot(w2, 20 * np.log10(abs(h2)),  'r', label="FIR2: " + str(FIR_CUT_OFF_2) + "Hz/" + str(FIR_TAP_NUM_2))
+    ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
     ax[1].grid()
     ax[1].title.set_text("Amplitude and phase characteristics")
@@ -309,15 +234,13 @@ if __name__ == "__main__":
     ax_11 = ax[1].twinx()
     angles = np.unwrap( np.angle(h) )
     angles_2 = np.unwrap( np.angle(h2) )
-    ax_11.plot(w, (angles*180/np.pi), 'g', label="phase 1")
-    ax_11.plot(w2, (angles_2*180/np.pi), 'r', label="phase 2")
-    ax_11.set_ylabel('Angle [degrees]', color='g')
+    ax_11.plot(w, (angles*180/np.pi),       'b', label="FIR1")
+    ax_11.plot(w2, (angles_2*180/np.pi),    'y', label="FIR2")
+    ax_11.set_ylabel('Angle [degrees]')
     ax_11.axis('tight')
     ax_11.legend(loc="lower right")
 
     plt.show()
-    
-
 
 # ===============================================================================
 #       END OF FILE

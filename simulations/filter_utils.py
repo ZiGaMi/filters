@@ -128,6 +128,66 @@ class SignalMux:
         return _out
 
 
+
+## Circular buffer
+class CircBuffer:
+
+    def __init__(self, size):
+        self.buf = [0.0] * size
+        self.idx = 0
+        self.size = size
+    
+    def __manage_index(self):
+        if self.idx >= (self.size - 1):
+            self.idx = 0
+        else:
+            self.idx = self.idx + 1
+
+    def set(self, val):
+        if self.idx < self.size:
+            self.buf[self.idx] = val
+            self.__manage_index()
+        else:
+            raise AssertionError
+
+    def get(self, idx):
+        if idx < self.size:
+            return self.buf[idx]
+        else:
+            raise AssertionError
+    
+    def get_tail(self):
+        return self.idx
+
+    def get_size(self):
+        return self.size
+
+    def get_whole_buffer(self):
+        return self.buf
+
+    """
+        Returns array of time sorted samples in buffer
+        [ n, n-1, n-2, ... n - size - 1 ]
+    """
+    def get_time_ordered_samples(self):
+
+        _ordered = [0.0] * self.size
+        _start_idx = 0
+
+        _start_idx = self.idx - 1
+        if _start_idx < 0:
+            _start_idx += self.size
+
+        # Sort samples per time
+        for n in range( self.size ):
+            _last_idx = _start_idx - n
+            if _last_idx < 0:
+                _last_idx += self.size 
+            _ordered[n] = self.buf[_last_idx]
+
+        return _ordered
+
+
 # ===============================================================================
 #       END OF FILE
 # ===============================================================================

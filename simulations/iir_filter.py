@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt, bilinear
 
+from filter_utils import FunctionGenerator, SignalMux, CircBuffer
+
 # ===============================================================================
 #       CONSTANTS
 # ===============================================================================
@@ -37,20 +39,21 @@ IDEAL_SAMPLE_FREQ = 20000.0
 # Unit: second
 TIME_WINDOW = 6
 
-## Number of samples in time window
-SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
-
-## Select input filter signal type
-INPUT_SINE = 0
-INPUT_RECT = 1
+## Input signal shape
+INPUT_SIGNAL_AMPLITUDE = 1.0
+INPUT_SIGNAL_OFFSET = 0.0
+INPUT_SIGNAL_PHASE = 0.0
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_SINE
+INPUT_SIGNAL_SELECTION = SignalMux.MUX_CTRL_SINE
 
 ## Input signal frequency
 #
 # Unit: Hz
-INPUT_SIGNAL_FREQ = 1.0
+INPUT_SIGNAL_FREQ = 1
+
+## Number of samples in time window
+SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 
 ## Cutoff freqeuncy of filter
 #
@@ -83,56 +86,6 @@ LPF_Z_2 = 1.75
 # ===============================================================================
 #       FUNCTIONS
 # ===============================================================================
-
-# ===============================================================================
-# @brief: Input signal mux
-#
-# @param[in]:    sel     - Multiplexor selector  
-# @param[in]:    in_1    - Input 1 
-# @param[in]:    in_2    - Input 2 
-# @return:       Either in_1 or in_2
-# ===============================================================================
-def input_signal_mux(sel, in_1, in_2):
-    if ( INPUT_SINE == sel ):
-        return in_1
-    elif ( INPUT_RECT == sel ):
-        return in_2
-    else:
-        pass
-
-# ===============================================================================
-# @brief: Generate sine as injected signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of sine
-# @param[in]:    off     - DC offset of sine
-# @param[in]:    phase   - Phase of sine
-# @return:       Generated signal
-# ===============================================================================
-def generate_sine(time, freq, amp, off, phase):
-    return (( amp * np.sin((2*np.pi*freq*time) + phase )) + off )
-
-
-# ===============================================================================
-# @brief: Generate rectangle signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of rectange
-# @param[in]:    off     - DC offset of rectangle
-# @param[in]:    phase   - Phase of rectangle
-# @return:       Generated signal
-# ===============================================================================
-def generate_rect(time, freq, amp, off, phase):
-    _carier = generate_sine(time, freq, 1.0, 0.0, phase)
-    _sig = 0
-
-    if ( _carier > 0 ):
-        _sig = amp + off
-    else:
-        _sig = off
-
-    return _sig 
-
 
 # ===============================================================================
 # @brief:   calculate 2nd order high pass filter based on following 
@@ -209,64 +162,6 @@ def calculate_2nd_order_notch_coeff(fc, fs, r):
 # ===============================================================================
 #       CLASSES
 # ===============================================================================
-
-## Circular buffer
-class CircBuffer:
-
-    def __init__(self, size):
-        self.buf = [0.0] * size
-        self.idx = 0
-        self.size = size
-    
-    def __manage_index(self):
-        if self.idx >= (self.size - 1):
-            self.idx = 0
-        else:
-            self.idx = self.idx + 1
-
-    def set(self, val):
-        if self.idx < self.size:
-            self.buf[self.idx] = val
-            self.__manage_index()
-        else:
-            raise AssertionError
-
-    def get(self, idx):
-        if idx < self.size:
-            return self.buf[idx]
-        else:
-            raise AssertionError
-
-    """
-        Returns array of time sorted samples in buffer
-        [ n, n-1, n-2, ... n - size - 1 ]
-    """
-    def get_time_ordered_samples(self):
-
-        _ordered = [0.0] * self.size
-        _start_idx = 0
-
-        _start_idx = self.idx - 1
-        if _start_idx < 0:
-            _start_idx += self.size
-
-        # Sort samples per time
-        for n in range( self.size ):
-            _last_idx = _start_idx - n
-            if _last_idx < 0:
-                _last_idx += self.size 
-            _ordered[n] = self.buf[_last_idx]
-
-        return _ordered
-
-    def get_tail(self):
-        return self.idx
-
-    def get_size(self):
-        return self.size
-
-    def get_whole_buffer(self):
-        return self.buf
 
 ## IIR Filter
 class IIR:
@@ -381,27 +276,33 @@ if __name__ == "__main__":
     _y_d_iir_notch_2 = [0]
 
     # Generate inputs
+    _fg_sine = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "sine" )
+    _fg_ac_noise = FunctionGenerator( 50.0, 0.2, 0, 0, "sine" )
+    _fg_rect = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "rect" )
     _sin_x = []
     _rect_x = []
-
     _ac_power_noise = []
 
+    # Signal mux
+    # NOTE: Support only sine and rectange
+    _signa_mux = SignalMux( 2 )
+    
     # Down sample
     _downsamp_cnt = 0
     _downsamp_samp = [0]
     _d_time = [0]
     
+    # Generate stimuli signals
     for n in range(SAMPLE_NUM):
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 ))  
-        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, 1.0, 0.0, 0.0 )) 
-        
-        _ac_power_noise.append( _sin_x[-1] +  generate_sine( _time[n], 50.0, 0.15, 0.0, 0.0 ) )
+        _sin_x.append( _fg_sine.generate( _time[n] ))
+        _rect_x.append( _fg_rect.generate( _time[n] ))
+        _ac_power_noise.append( _sin_x[-1] +  _fg_ac_noise.generate( _time[n] ) )
  
     # Apply filter
     for n in range(SAMPLE_NUM):
         
         # Mux input signals
-        _x[n] = input_signal_mux( INPUT_SIGNAL_SELECTION, _sin_x[n], _rect_x[n] )
+        _x[n] = _signa_mux.out( INPUT_SIGNAL_SELECTION, [ _sin_x[n], _rect_x[n] ] )
 
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
