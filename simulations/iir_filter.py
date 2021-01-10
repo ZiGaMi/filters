@@ -435,7 +435,7 @@ if __name__ == "__main__":
     ax3[1].grid()
     #ax3[1].set_ylim(-80, 20)
     #ax3[1].set_xlim(0.001, SAMPLE_FREQ/4)
-    ax3[1].set_xscale("log")
+    #ax3[1].set_xscale("log")
     ax3[1].legend(loc="upper right")
 
     plt.show()
