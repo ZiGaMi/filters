@@ -14,6 +14,8 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 
+from filter_utils import FunctionGenerator, SignalMux
+
 # ===============================================================================
 #       CONSTANTS
 # ===============================================================================
@@ -37,17 +39,13 @@ IDEAL_SAMPLE_FREQ = 20000.0
 # Unit: second
 TIME_WINDOW = 2.5
 
-## Select input filter signal type
-INPUT_SINE = 0
-INPUT_RECT = 1
-
 ## Input signal shape
 INPUT_SIGNAL_AMPLITUDE = 1.0
 INPUT_SIGNAL_OFFSET = 0.0
 INPUT_SIGNAL_PHASE = 0.0
 
 ## Mux input signal
-INPUT_SIGNAL_SELECTION = INPUT_SINE
+INPUT_SIGNAL_SELECTION = SignalMux.MUX_CTRL_SINE
 
 ## Input signal frequency
 #
@@ -82,60 +80,6 @@ HPF_ORDER_3 = 3
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
-
-
-# ===============================================================================
-#       FUNCTIONS
-# ===============================================================================
-
-# ===============================================================================
-# @brief: Input signal mux
-#
-# @param[in]:    sel     - Multiplexor selector  
-# @param[in]:    in_1    - Input 1 
-# @param[in]:    in_2    - Input 2 
-# @return:       Either in_1 or in_2
-# ===============================================================================
-def input_signal_mux(sel, in_1, in_2):
-    if ( INPUT_SINE == sel ):
-        return in_1
-    elif ( INPUT_RECT == sel ):
-        return in_2
-    else:
-        pass
-
-# ===============================================================================
-# @brief: Generate sine as injected signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of sine
-# @param[in]:    off     - DC offset of sine
-# @param[in]:    phase   - Phase of sine
-# @return:       Generated signal
-# ===============================================================================
-def generate_sine(time, freq, amp, off, phase):
-    return (( amp * np.sin((2*np.pi*freq*time) + phase )) + off )
-
-
-# ===============================================================================
-# @brief: Generate rectangle signal
-#
-# @param[in]:    time    - Linear time  
-# @param[in]:    amp     - Amplitude of rectange
-# @param[in]:    off     - DC offset of rectangle
-# @param[in]:    phase   - Phase of rectangle
-# @return:       Generated signal
-# ===============================================================================
-def generate_rect(time, freq, amp, off, phase):
-    _carier = generate_sine(time, freq, 1.0, 0.0, phase)
-    _sig = 0
-
-    if ( _carier > 0 ):
-        _sig = amp + off
-    else:
-        _sig = off
-
-    return _sig 
 
 
 # ===============================================================================
@@ -240,23 +184,30 @@ if __name__ == "__main__":
     _y_d_hpf_3 = [0]
 
     # Generate inputs
+    _fg_sine = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "sine" )
+    _fg_rect = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "rect" )
     _sin_x = []
     _rect_x = []
+
+    # Signal mux
+    # NOTE: Support only sine and rectange
+    _signa_mux = SignalMux( 2 )
 
     # Down sample
     _downsamp_cnt = 0
     _downsamp_samp = [0]
     _d_time = [0]
     
+    # Generate stimuli signals
     for n in range(SAMPLE_NUM):
-        _sin_x.append( generate_sine( _time[n], INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE ))  
-        _rect_x.append( generate_rect( _time[n], INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE ))  
+        _sin_x.append( _fg_sine.generate( _time[n] ))
+        _rect_x.append( _fg_rect.generate( _time[n] ))
  
     # Apply filter
     for n in range(SAMPLE_NUM):
         
         # Mux input signals
-        _x[n] = input_signal_mux( INPUT_SIGNAL_SELECTION, _sin_x[n], _rect_x[n] )
+        _x[n] = _signa_mux.out( INPUT_SIGNAL_SELECTION, [ _sin_x[n], _rect_x[n] ] )
 
         # LPF
         _y_lpf_1.append( _filter_LPF_1.update( _x[n] ) )
