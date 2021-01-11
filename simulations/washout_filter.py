@@ -1,9 +1,10 @@
 # ===============================================================================
-# @file:    iir_filter.py
-# @note:    This script is evaluation of IIR filter algorithm
+# @file:    washout_filter.py
+# @note:    This script is evaluation of washout filter algorithm
 # @author:  Ziga Miklosic
-# @date:    06.01.2021
-# @brief:   Evaluation of IIR filter design. 
+# @date:    11.01.2021
+# @brief:   Evaluation of washout filter design. This evaluation is for designing
+#           a working washout filter used for steward platform. 
 # ===============================================================================
 
 # ===============================================================================
@@ -14,7 +15,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import freqz, butter, cheby1, lfilter, filtfilt, bilinear
 
-from filter_utils import FunctionGenerator, SignalMux, CircBuffer
+from filter_utils import FunctionGenerator, SignalMux
+from iir_filter import IIR, calculate_2nd_order_HPF_coeff, calculate_1nd_order_HPF_coeff, calculate_2nd_order_LPF_coeff
 
 # ===============================================================================
 #       CONSTANTS
@@ -81,6 +83,48 @@ HPF_Z_2 = 0.701
 LPF_Z_1 = .25
 LPF_Z_2 = 1.0
 
+
+# =====================================================
+## TRANSLATION CHANNEL SETTINGS
+
+# HPF Wht 2nd order filter
+WASHOUT_HPF_WHT_FC  = 1.0
+WASHOUT_HPF_WHT_Z   = 0.7071
+
+# HPF Wrtzt 1st order filter
+WASHOUT_HPF_WRTZT_FC  = 1.0
+
+# SCALE AND LIMIT
+# [ x, y, z]
+WASHOUT_SCALE_A_T = [ 1.0, 1.0, 1.0 ]
+WASHOUT_LIMIT_A_T = [ 4.0, 4.0, 4.0 ]
+
+
+# =====================================================
+## COORDINATION CHANNEL SETTINGS
+
+# LPF W12 2nd order filter
+WASHOUT_LPF_W12_FC  = 1.0
+WASHOUT_LPF_W12_Z   = 0.7071
+
+# SCALE AND LIMIT
+# [ x, y, z]
+WASHOUT_SCALE_A_C = [ 1.0, 1.0, 1.0 ]
+WASHOUT_LIMIT_A_C = [ 4.0, 4.0, 4.0 ]
+
+
+# =====================================================
+## ROTATION CHANNEL SETTINGS
+
+# HPF W11 1st order filter
+WASHOUT_HPF_W11_FC  = 1.0
+
+# SCALE AND LIMIT
+# [ rool, pitch, yaw]
+WASHOUT_SCALE_BETA = [ 1.0, 1.0, 1.0 ]
+WASHOUT_LIMIT_BETA = [ 0.2, 0.2, 0.2 ]
+
+
 ## ****** END OF USER CONFIGURATIONS ******
 
 # ===============================================================================
@@ -88,139 +132,86 @@ LPF_Z_2 = 1.0
 # ===============================================================================
 
 # ===============================================================================
-# @brief:   calculate 2nd order high pass filter based on following 
-#           transfer function:
-#           
-#               h(s) = s^2 / ( s^2 + 2*z*w*s + w^2 )  --- bilinear ---> h(z)
-#
-# @param[in]:    fc     - Corner frequenc
-# @param[in]:    z      - Damping factor
-# @param[in]:    fs     - Sample frequency
-# @return:       b,a    - Array of b,a IIR coefficients
-# ===============================================================================
-def calculate_2nd_order_HPF_coeff(fc, z, fs):
-    
-    # Calculate omega
-    w = 2*np.pi*fc
-
-    # Make bilinear transformation
-    b, a = bilinear( [1,0,0], [1,2*z*w,w**2], fs )
-
-    return b, a
-
-
-# ===============================================================================
-# @brief:   calculate 1nd order high pass filter based on following 
-#           transfer function:
-#           
-#               h(s) = s / ( s + w )  --- bilinear ---> h(z)
-#
-# @param[in]:    fc     - Corner frequenc
-# @param[in]:    fs     - Sample frequency
-# @return:       b,a    - Array of b,a IIR coefficients
-# ===============================================================================
-def calculate_1nd_order_HPF_coeff(fc, fs):
-    
-    # Calculate omega
-    w = 2*np.pi*fc
-
-    # Make bilinear transformation
-    b, a = bilinear( [1,0], [1,w], fs )
-
-    return b, a
-
-
-# ===============================================================================
-# @brief:   calculate 2nd order low pass filter based on following 
-#           transfer function:
-#           
-#               h(s) = w^2 / ( s^2 + 2*z*w*s + w^2 ) --- bilinear ---> h(z)
-#
-# @param[in]:    fc     - Corner frequenc
-# @param[in]:    z      - Damping factor
-# @param[in]:    fs     - Sample frequency
-# @return:       b,a    - Array of b,a IIR coefficients
-# ===============================================================================
-def calculate_2nd_order_LPF_coeff(fc, z, fs):
-
-    # Calculate omega
-    w = 2*np.pi*fc
-
-    # Using bilinear transformation
-    b, a = bilinear( [0,0,w**2], [1,2*z*w,w**2], fs )
-
-    return b, a
-
-
-# ===============================================================================
-# @brief:   calculate 2nd order notch filter. This code is from 
-#           "Second-order IIR Notch Filter Design and implementation of digital
-#           signal processing system" acticle
-#
-# @param[in]:    fc     - Corner frequenc
-# @param[in]:    fs     - Sample frequency
-# @return:       b,a    - Array of b,a IIR coefficients
-# ===============================================================================
-def calculate_2nd_order_notch_coeff(fc, fs, r):
-   
-    _w = 2 * np.pi * fc / fs
-
-    # Calculate coefficient
-    a2 = r*r
-    a1 = -2*r*np.cos( _w ) 
-    a0 = 1
-    
-    b2 = 1
-    b1 = -2*np.cos( _w )
-    b0 = 1
-    
-    # Fill array
-    a = [ a0, a1, a2 ] 
-    b = [ b0, b1, b2 ] 
-
-    return b, a
-
-# ===============================================================================
 #       CLASSES
 # ===============================================================================    
 
 ## IIR Filter
-class IIR:
+class Washout:
 
-    def __init__(self, a, b, order):
+    def __init__(self, Wht, Wrtzt, W11, W12, fs):
 
-        # Store tap number and coefficient
-        self.order = order
-        self.a = a
-        self.b = b
+        # Translation channel filters
+        b, a = calculate_2nd_order_HPF_coeff( Wht[0], Wht[1], fs )
+        self._hpf_wht = [0] * 3
+        self._hpf_wht[0] = IIR( a, b, 2 )
+        self._hpf_wht[1] = IIR( a, b, 2 )
+        self._hpf_wht[2] = IIR( a, b, 2 )
 
-        # Create circular buffer
-        self.x = CircBuffer(order+1)
-        self.y = CircBuffer(order+1)
+        b, a = calculate_1nd_order_HPF_coeff( Wrtzt, fs )
+        self._hpf_wrtzt = [0] * 3
+        self._hpf_wrtzt[0] = IIR( a, b, 1 )
+        self._hpf_wrtzt[1] = IIR( a, b, 1 )
+        self._hpf_wrtzt[2] = IIR( a, b, 1 )
+
+        # Coordination channel filters
+        b, a = calculate_2nd_order_LPF_coeff( W12[0], W12[1], fs )
+        self._hpf_w12 = [0] * 3
+        self._hpf_w12[0] = IIR( a, b, 2 )
+        self._hpf_w12[1] = IIR( a, b, 2 )
+        self._hpf_w12[2] = IIR( a, b, 2 )
+
+        # Rotation channel filters
+        b, a = calculate_1nd_order_HPF_coeff( W11, fs )
+        self._hpf_w22 = [0] * 3
+        self._hpf_w22[0] = IIR( a, b, 1 )
+        self._hpf_w22[1] = IIR( a, b, 1 )
+        self._hpf_w22[2] = IIR( a, b, 1 )
 
 
-    def update(self, x):
-        
-        # Fill input
-        self.x.set( x )
+    # ===============================================================================
+    # @brief: Update washout filter
+    #
+    # @param[in]:    a      - Vector of accelerations
+    # @param[in]:    beta   - Vector of angular velocities
+    # @return:       p, r   - Positions and rotation of a steward platform
+    # ===============================================================================
+    def update(self, a, beta):
+        p = []
+        r = []
 
-        # Get input/outputs history
-        _x = self.x.get_time_ordered_samples()
-        _y = self.y.get_time_ordered_samples()
+        # Translation accelerations
+        a_t = [0] * 3
 
-        # Calculate new value
-        y = 0.0
-        for j in range(self.order+1):
+        # Coordination accelerations
+        a_c = [0] * 3
 
-            y = y + (self.b[j] * _x[j])
+        # Rotations
+        beta = [0] * 3
 
-            if j > 0:
-                y = y - (self.a[j] * _y[j-1])
+        # Apply scaling and limitations
+        for n in range(3):
+            a_t[n]  = self.__scale_limit( a[n], WASHOUT_SCALE_A_T[n], WASHOUT_LIMIT_A_T[n] )
+            a_c[n]  = self.__scale_limit( a[n], WASHOUT_SCALE_A_C[n], WASHOUT_LIMIT_A_C[n] )
+            beta[n] = self.__scale_limit( a[n], WASHOUT_SCALE_BETA[n], WASHOUT_LIMIT_BETA[n] )
 
-        y = ( y * ( 1 / self.a[0] ))
+        # Translation filters
 
-        # Fill output
-        self.y.set(y)
+
+
+        return p, r
+
+
+    # ===============================================================================
+    # @brief: Scale and limit input signals
+    #
+    #   NOTE: For know limiting is very simple, shall be change to poly order 3!!!
+    #
+    # @param[in]:    x      - Input signal value
+    # @param[in]:    scale  - Scale factor
+    # @param[in]:    lim    - Limit factor
+    # @return:       y      - Scaled and limited value
+    # ===============================================================================
+    def __scale_limit(self, x, scale, lim):
 
         return y
 
@@ -233,50 +224,10 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
-    # Calculate coefficient for 2nd order HPF
-    b, a        = calculate_2nd_order_HPF_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
-    b_2, a_2    = calculate_2nd_order_HPF_coeff( HPF_FC_2, HPF_Z_2, SAMPLE_FREQ )
-    
-    # Calculate coefficient for 2nd order LPF
-    lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
-    lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
-
-    # Calculate coefficient for 2nd order notch filter
-    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.925 )
-    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.90 )
-
-    # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
-    b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
-    b_c, a_c = cheby1( N=2, Wn=HPF_FC_CHEBY, btype="highpass", analog=False, fs=SAMPLE_FREQ, rp=0.99 )
-
-    b_b_lpf, a_b_lpf = butter( N=2, Wn=LPF_FC_BUTTER, btype="lowpass", analog=False, fs=SAMPLE_FREQ )
-    b_c_lpf, a_c_lpf = cheby1( N=2, Wn=LPF_FC_CHEBY, btype="lowpass", analog=False, fs=SAMPLE_FREQ, rp=0.99 )
-
-    # Get frequency characteristics
-    w, h = freqz( b, a, 4096 )
-    w_2, h_2 = freqz( b_2, a_2, 4096 )
-    
-    w_b, h_b = freqz( b_b, a_b, 4096 )
-    w_c, h_c = freqz( b_c, a_c, 4096 )
-
-    w_b_lpf, h_b_lpf = freqz( b_b_lpf, a_b_lpf, 4096 )
-    w_c_lpf, h_c_lpf = freqz( b_c_lpf, a_c_lpf, 4096 )
-    
-    w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
-    w_lpf_2, h_lpf_2 = freqz( lpf_b_2, lpf_a_2, 4096 )
-
-    w_notch, h_notch = freqz( notch_b, notch_a, 4096 )
-    w_notch_2, h_notch_2 = freqz( notch_b_2, notch_a_2, 4096 )
     
     # Filter object
-    _filter_IIR     = IIR( a, b, order=2 ) 
-    _filter_IIR_2   = IIR( a_2, b_2, order=2 ) 
-
-    _filter_IIR_LPF   = IIR( lpf_a, lpf_b, order=2 ) 
-    _filter_IIR_LPF_2 = IIR( lpf_a_2, lpf_b_2, order=2 ) 
-
-    _filter_IIR_NOTCH = IIR( notch_a, notch_b, order=2 ) 
-    _filter_IIR_NOTCH_2 = IIR( notch_a_2, notch_b_2, order=2 ) 
+    _filter_washout = Washout(  Wht=[WASHOUT_HPF_WHT_FC, WASHOUT_HPF_WHT_Z], Wrtzt=WASHOUT_HPF_WRTZT_FC, \
+                                W11=WASHOUT_HPF_W11_FC, W12=[WASHOUT_LPF_W12_FC, WASHOUT_LPF_W12_Z], fs=SAMPLE_FREQ )
 
     print("lpf_a: %s" % lpf_a)
     print("lpf_b: %s" % lpf_b)

@@ -26,7 +26,7 @@ from filter_utils import FunctionGenerator, SignalMux
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 100.0
+SAMPLE_FREQ = 200.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -67,9 +67,9 @@ LPF_ORDER_3 = 3
 ## HPF fc
 #
 # Unit: Hz
-HPF_FC_1 = 0.1
-HPF_FC_2 = 0.1
-HPF_FC_3 = 0.1
+HPF_FC_1 = 10
+HPF_FC_2 = 10
+HPF_FC_3 = 10
 
 ## HPF order
 HPF_ORDER_1 = 1
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     ax[0,1].legend(loc="upper right")
 
     ax[1,0].plot( _time, _x, "b" )
-    ax[1,0].plot( _time, _y_hpf_1, "g", label="RC1: " + str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
+    ax[1,0].plot( _time, _y_hpf_1, "g", label="CR1: " + str(HPF_FC_1) + "Hz/" + str(HPF_ORDER_1))
     ax[1,0].plot( _time, _y_hpf_2, "r", label="CR2: " + str(HPF_FC_2) + "Hz/" + str(HPF_ORDER_2))
     ax[1,0].plot( _time, _y_hpf_3, "y", label="CR2: " + str(HPF_FC_3) + "Hz/" + str(HPF_ORDER_3))
     ax[1,0].grid()
