@@ -8,6 +8,15 @@
 # ===============================================================================
 
 # ===============================================================================
+#  TODO:
+#
+#   - Enable/Disable via check box showing pos/vel/acc as output of w filter
+#   - Make sliders for setting coefficients of filters
+#   - Make 5 additional signal generators to simulate all dimensions
+#   - Make easy configuration to change stimuli signal to acceleration or rotation
+# ===============================================================================
+
+# ===============================================================================
 #       IMPORTS  
 # ===============================================================================
 import sys
@@ -42,17 +51,13 @@ IDEAL_SAMPLE_FREQ = 20000.0
 TIME_WINDOW = 2
 
 ## Input signal shape
+INPUT_SIGNAL_FREQ = 0.1
 INPUT_SIGNAL_AMPLITUDE = 0.5
 INPUT_SIGNAL_OFFSET = 0.0
-INPUT_SIGNAL_PHASE = -1.57
+INPUT_SIGNAL_PHASE = -0.25
 
 ## Mux input signal
 INPUT_SIGNAL_SELECTION = SignalMux.MUX_CTRL_RECT
-
-## Input signal frequency
-#
-# Unit: Hz
-INPUT_SIGNAL_FREQ = 0.5
 
 ## Number of samples in time window
 SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
@@ -63,7 +68,7 @@ SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 
 # HPF Wht 2nd order filter
 WASHOUT_HPF_WHT_FC  = 1.0
-WASHOUT_HPF_WHT_Z   = 0.7071
+WASHOUT_HPF_WHT_Z   = .7071
 
 # HPF Wrtzt 1st order filter
 WASHOUT_HPF_WRTZT_FC  = 1.0
@@ -78,8 +83,8 @@ WASHOUT_LIMIT_A_T = [ 2.0, 2.0, 2.0 ] # Limits are symetrical
 ## COORDINATION CHANNEL SETTINGS
 
 # LPF W12 2nd order filter
-WASHOUT_LPF_W12_FC  = 10.0
-WASHOUT_LPF_W12_Z   = 0.7071
+WASHOUT_LPF_W12_FC  = 1.0
+WASHOUT_LPF_W12_Z   = 1.0
 
 # SCALE AND LIMIT 
 # [ x, y, z]
@@ -121,6 +126,18 @@ WASHOUT_LIMIT_BETA = [ 0.2, 0.2, 0.2 ]
 #       CLASSES
 # ===============================================================================    
 
+
+## Integration
+class Integrator:
+
+    def __init__(self, init_val=0):
+        self.y = init_val
+
+    def update(self, x):
+        self.y += x
+        return self.y
+
+
 ## IIR Filter
 class Washout:
 
@@ -153,6 +170,15 @@ class Washout:
         self._hpf_w22[1] = IIR( a, b, 1 )
         self._hpf_w22[2] = IIR( a, b, 1 )
 
+        # Translation channel integrators
+        self._int_x = [0] * 2
+        self._int_y = [0] * 2
+        self._int_z = [0] * 2
+        for n in range(2):
+            self._int_x[n] = Integrator()
+            self._int_y[n] = Integrator()
+            self._int_z[n] = Integrator()
+
 
     # ===============================================================================
     # @brief: Update washout filter
@@ -178,9 +204,15 @@ class Washout:
             a_t[n] = self._hpf_wht[n].update( a_t[n] )
             a_t[n] = self._hpf_wrtzt[n].update( a_t[n] )
 
-            # Integration
-            # TODO:...
+        # Integration
+        a_t[0] = self._int_x[0].update(a_t[0])
+        a_t[0] = self._int_x[1].update(a_t[0])
 
+        a_t[1] = self._int_y[0].update(a_t[1])
+        a_t[1] = self._int_y[1].update(a_t[1])
+
+        a_t[2] = self._int_z[0].update(a_t[2])
+        a_t[2] = self._int_z[1].update(a_t[2])
 
         # Coordingation channel scaling/limitation/filtering
         for n in range(3):
@@ -225,6 +257,9 @@ class Washout:
             pass
 
         return y
+
+
+
 
 
 # ===============================================================================
@@ -286,8 +321,7 @@ if __name__ == "__main__":
             _d_time.append( _time[n])
             _x_d.append( _x[n] )
 
-
-            p, r = _filter_washout.update( [ 0, 0, 0 ], [ _x[n], 0, 0 ] )
+            p, r = _filter_washout.update( [ _x[n], 0, 0 ], [ 0, 0, 0 ] )
             _y_d_p[0].append( p[0] )
             _y_d_p[1].append( p[1] )
             _y_d_p[2].append( p[2] )
@@ -295,29 +329,29 @@ if __name__ == "__main__":
             _y_d_r[1].append( r[1] )
             _y_d_r[2].append( r[2] )
 
-
         else:
             _downsamp_cnt += 1
     
     # Plot results
-    fig, ax = plt.subplots(2, 1)
-    fig.suptitle( "WASHOUT FILTERS\n fs: " + str(SAMPLE_FREQ), fontsize=20 )
+    fig, ax = plt.subplots(2, 1, sharex=True)
+    fig.suptitle( "WASHOUT FILTERS\n fs: " + str(SAMPLE_FREQ) + "Hz", fontsize=20 )
+
+    ax11 = ax[0].twinx() 
+    ax11.plot( _time, _x, "b--", lw=1.0, label="ax" )
+    ax11.set_ylim( -2, 2 )
+    ax11.legend(loc="lower right")
+    ax11.set_ylabel('Acceleration [m/s^2]', fontsize=14)
 
     ax[0].set_title("Translations", fontsize=16)
-    ax[0].plot( _time, _x,                  "b",    label="ax" )
-    #ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
-    ax[0].plot( _d_time, _y_d_p[0],         "g.-",    label="ax")
-    ax[0].plot( _d_time, _y_d_p[1],         "r.-",    label="ay")
-    ax[0].plot( _d_time, _y_d_p[2],         "y.-",    label="az")
-    
-    ax[0].set_ylabel('Amplitude')
-    ax[0].set_xlabel('Time [s]')
+    ax[0].plot( _d_time, _y_d_p[0],         "g.-",    label="x")
+    ax[0].plot( _d_time, _y_d_p[1],         "r.-",    label="y")
+    ax[0].plot( _d_time, _y_d_p[2],         "y.-",    label="z")
+    ax[0].set_ylim(-80, 80)
+    ax[0].set_ylabel('Translation [mm]', fontsize=14)
     ax[0].grid()
     ax[0].legend(loc="upper right")
 
     ax[1].set_title("Rotations", fontsize=16)
-    ax[1].plot( _time, _x,                  "b",    label="Input-generated" )
-    #ax[1].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax[1].plot( _d_time, _y_d_r[0],         "g.-",    label="roll")
     ax[1].plot( _d_time, _y_d_r[1],         "r.-",    label="pitch")
     ax[1].plot( _d_time, _y_d_r[2],         "y.-",    label="yaw")
