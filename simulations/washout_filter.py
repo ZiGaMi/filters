@@ -42,7 +42,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 TIME_WINDOW = 2
 
 ## Input signal shape
-INPUT_SIGNAL_AMPLITUDE = 2.0
+INPUT_SIGNAL_AMPLITUDE = 0.5
 INPUT_SIGNAL_OFFSET = 0.0
 INPUT_SIGNAL_PHASE = -1.57
 
@@ -172,37 +172,34 @@ class Washout:
         # Rotations channel
         beta_r = [0] * 3
 
-        # Loop all axis
+        # Translation channel scaling/limitation/filtering/integration
         for n in range(3):
-
-            # Apply scaling and limitations
-            a_t[n]  = self.__scale_limit( a[n], WASHOUT_SCALE_A_T[n], WASHOUT_LIMIT_A_T[n] )
-            a_c[n]  = self.__scale_limit( a[n], WASHOUT_SCALE_A_C[n], WASHOUT_LIMIT_A_C[n] )
-            beta_r[n] = self.__scale_limit( beta[n], WASHOUT_SCALE_BETA[n], WASHOUT_LIMIT_BETA[n] )
-
-            # Translation filters
+            a_t[n] = self.__scale_limit( a[n], WASHOUT_SCALE_A_T[n], WASHOUT_LIMIT_A_T[n] )
             a_t[n] = self._hpf_wht[n].update( a_t[n] )
             a_t[n] = self._hpf_wrtzt[n].update( a_t[n] )
 
-            # Coordiation filters
+            # Integration
+            # TODO:...
+
+
+        # Coordingation channel scaling/limitation/filtering
+        for n in range(3):
+            a_c[n]  = self.__scale_limit( a[n], WASHOUT_SCALE_A_C[n], WASHOUT_LIMIT_A_C[n] )
             a_c[n] = self._lpf_w12[n].update( a_c[n] )
 
-            # Rotational filter
+        # Tilt coordination
+        a_c_tilt = [0] * 3
+        for n in range(3):
+            for j in range(3):
+                a_c_tilt[n] += WASHOUT_TILT_MATRIX[n][j] * a_c[j]
+
+        # Rotaion scaling/limitation/filtering
+        for n in range(3):
+            beta_r[n] = self.__scale_limit( beta[n], WASHOUT_SCALE_BETA[n], WASHOUT_LIMIT_BETA[n] )
             beta_r[n] = self._hpf_w22[n].update( beta_r[n] )
 
-            # Tilt coordination matrix
-            # NOTE: This operation convert acceleration to angle
-            _a_c = a_c
-            for j in range(3):
-                #a_c[n] = WASHOUT_TILT_MATRIX[n][j] * _a_c[j]
-                pass
-
-            # Tilt rate limiter
-            # TODO: Implement rate limiter not limiter!!!
-            a_c[n] = self.__scale_limit( a_c[n], 1.0,  WASHOUT_TILT_LIMIT[n] )
-
             # Add tilt to rotation channel
-            beta_r[n] += a_c[n]
+            beta_r[n] += a_c_tilt[n]
 
         return a_t, beta_r
 
@@ -218,7 +215,6 @@ class Washout:
     # @return:       y      - Scaled and limited value
     # ===============================================================================
     def __scale_limit(self, x, scale, lim):
-
         y = scale * x
 
         if y > lim:
@@ -291,7 +287,7 @@ if __name__ == "__main__":
             _x_d.append( _x[n] )
 
 
-            p, r = _filter_washout.update( [ _x[n], 0, 0 ], [ 0, 0, 0 ] )
+            p, r = _filter_washout.update( [ 0, 0, 0 ], [ _x[n], 0, 0 ] )
             _y_d_p[0].append( p[0] )
             _y_d_p[1].append( p[1] )
             _y_d_p[2].append( p[2] )
@@ -305,10 +301,10 @@ if __name__ == "__main__":
     
     # Plot results
     fig, ax = plt.subplots(2, 1)
-    fig.suptitle( "WASHOUT FILTERS", fontsize=20 )
+    fig.suptitle( "WASHOUT FILTERS\n fs: " + str(SAMPLE_FREQ), fontsize=20 )
 
     ax[0].set_title("Translations", fontsize=16)
-    ax[0].plot( _time, _x,                  "b",    label="Input-generated" )
+    ax[0].plot( _time, _x,                  "b",    label="ax" )
     #ax[0].plot( _d_time, _downsamp_samp,    "r.",   label="Sample points")
     ax[0].plot( _d_time, _y_d_p[0],         "g.-",    label="ax")
     ax[0].plot( _d_time, _y_d_p[1],         "r.-",    label="ay")
