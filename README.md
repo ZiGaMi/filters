@@ -110,7 +110,8 @@ Two different FIR filters were designed and tested on embedded platform (STM32) 
 
 First filter was low-pass designed with 9 taps and second with 25 taps. Both filters was design using T-Filter online calculator. Here are results of C implemented of filter:
 
-![](simulations\pics\FIR_evaluation\fir_evaluation_on_embedded_both_0&1.png)
+![](simulations/pics/FIR_evaluation/fir_evaluation_on_embedded_both_0&1.png)
+
 
 ```
 ********************************************************
