@@ -110,9 +110,14 @@ Two different FIR filters were designed and tested on embedded platform (STM32) 
 
 First filter was low-pass designed with 9 taps and second with 25 taps. Both filters was design using T-Filter online calculator. Here are results of C implemented of filter:
 
+C implementation:
 ![](simulations/pics/FIR_evaluation/fir_evaluation_on_embedded_both_0&1.png)
 
+Python simulation:
+![](simulations/pics/FIR_evaluation/fir_evaluation_on_real_data_0.png)
+![](simulations/pics/FIR_evaluation/fir_evaluation_on_real_data_1.png)
 
+Detailed description of filter used above:
 ```
 ********************************************************
  EVALUATION OF FIR FILTER
@@ -187,6 +192,55 @@ Invocation and configuration of script is identical to RC/CR and FIR simulations
 Notch filter is specialy designed to filter AC freuqency of 50Hz. Base input signal is 1Hz with added AC noise.
 ![](simulations/pics/notch_filter_simulation_example.png)
 
+##### C implementation tests
+
+Following two examples shows IIR filters in action where online acceleration data is being filtered with low pass 2nd order IIR filter. In first example cutoff frequency was set to 1Hz and in second 10Hz with sample frequency of 50Hz. Accelerometer was placed on top of steward platform in order to make equivalent test by controling movement of accelerometer.
+
+###### Example 0:
+
+C implementation
+![](simulations/pics/IIR_evaluation/iir_evaluation_on_embedded_0.png)
+
+Python simulation:
+![](simulations/pics/IIR_evaluation/iir_evaulation_on_real_data_0.png)
+
+###### Example 1:
+
+C implementation:
+![](simulations/pics/IIR_evaluation/iir_evaluation_on_embedded_1.png)
+
+Python simulation:
+![](simulations/pics/IIR_evaluation/iir_evaulation_on_real_data_1.png)
+
+Detailed desription of filter used in example above:
+```
+********************************************************
+ EVALUATION OF IIR FILTER
+******************************************************** 
+ 
+Coefficient were calculated by iir_filters.py
+ 
+================================================================
+EXAMPLE 0:
+================================================================
+pic: iir_evaluation_on_real_data_0.png
+a: [ 1.0, -1.96521693, 0.96909995]
+b: [0.00097075, 0.00194151, 0.00097075]
+fc = 1.0 Hz
+zeta = 0.25
+exe. time: 22us @180MHz (STM32H7)
+
+
+================================================================
+EXAMPLE 1:
+================================================================
+pic: iir_evaluation_on_real_data_1.png
+a = [1.0, -1.04377111, 0.27236453]
+b = [0.05714836, 0.11429671, 0.05714836]
+fc = 10.0 Hz
+zeta = 1.0
+exe. time: 22us @180MHz (STM32H7)
+```
 
 
 #### Reading signal from CSV file
@@ -268,7 +322,7 @@ loop @SAMPLE_TIME
 
 
 ### FIR filter
-There are only two functions being a part of RC filter API:
+There are only two functions being a part of FIR filter API:
  - filter_status_t ***filter_fir_init***(p_filter_fir_t * p_filter_inst, const float32_t *p_a, const uint8_t order)
  - float32_t ***filter_fir_update***(p_filter_fir_t p_filter_inst, const float32_t x)
 
@@ -312,6 +366,52 @@ loop @SAMPLE_TIME
 ```
 
 
+### IIR filter
+There are only two functions being a part of IIR filter API:
+ - filter_status_t ***filter_iir_init***(p_filter_iir_t * p_filter_inst, const float32_t *p_a, const float32_t *p_b, const uint32_t a_size, const uint32_t b_size )
+ - float32_t ***filter_iir_update***(p_filter_iir_t p_filter_inst, const float32_t x)
+
+
+ ##### Example of usage
+```C
+// 1. Declare filter instance
+p_filter_iir_t gp_filter_iir = NULL;
+
+/* 2. Prepare IIR coefficients
+* NOTE: Use iir_filter.py sript or external tool to get IIR coefficients.
+*/
+const float32_t gf_iir_a_coef[3] =
+{
+	1.0f,
+	-1.04377111f,
+	0.27236453f
+};
+
+const float32_t gf_iir_b_coef[3] =
+{
+	0.05714836f,
+	0.11429671f,
+	0.05714836f
+};
+
+/* 
+*   3. Init IIR filter with following parameters
+*/ 
+if ( eFILTER_OK != filter_iir_init( &gp_filter_iir, &gf_iir_a_coef, &gf_iir_b_coef, 3, 3 ))
+{
+    // Filter init failed
+    // Further actions here...
+}
+
+// 3. Apply filter in period of SAMPLE_TIME
+loop @SAMPLE_TIME
+{
+    // Update filter
+    filtered_signal = filter_iir_update( gp_filter_iir, raw_signal );
+}
+```
+
+
 ## TODO
  - [x] Evaluation of RC filter in python
  - [x] Evaluation of CR filter in python
@@ -322,10 +422,9 @@ loop @SAMPLE_TIME
  - [x] Make filter_csv.py configurable via argparse
  - [ ] Add row selection to filter_csv.py
  - [x] Implementation of FIR filter in C   
- - [ ] Implementation of IIR filter in C   
+ - [x] Implementation of IIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
- - [ ] Implementation of intergrator in C
 
 
     
