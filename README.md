@@ -105,6 +105,74 @@ This script gives an example of ***firwin*** function usage to calculate FIR fil
 
 ![](simulations/pics/fir_filter_simulation_example.png)
 
+##### C implementation tests
+Two different FIR filters were designed and tested on embedded platform (STM32) with current implementation of filter. Result of embedded filter were compared with python implementation of filter in order to confirm correct validation of C implementation.
+
+First filter was low-pass designed with 9 taps and second with 25 taps. Both filters was design using T-Filter online calculator. Here are results of C implemented of filter:
+
+![](simulations\pics\FIR_evaluation\fir_evaluation_on_embedded_both_0&1.png)
+
+```
+********************************************************
+ EVALUATION OF FIR FILTER
+******************************************************** 
+ 
+ Following coefficient were calcualted by online 
+ calculator: http://t-filter.engineerjs.com/
+ 
+================================================================
+EXAMPLE 0:
+================================================================
+pic: fir_evaluation_on_real_data_0.png
+coef:[  0.02341152899192398,
+        0.06471122356467367,
+        0.12060371719780817,
+        0.16958710211144923,
+        0.1891554348168665,
+        0.16958710211144923,
+        0.12060371719780817,
+        0.06471122356467367,
+        0.02341152899192398,
+     ]
+taps: 9
+
+================================================================
+EXAMPLE 1:
+================================================================
+pic: fir_evaluation_on_real_data_1.png
+coef:[  -0.005392788920679466,
+        -0.0029050919204011926,
+        -0.001258909518015039,
+        0.0031062514135009396,
+        0.010866599224457303,
+        0.02226527409028689,
+        0.036982494521830354,
+        0.05407161051837529,
+        0.07200917783384833,
+        0.0889018940568695,
+        0.10277548127558198,
+        0.11189425867893746,
+        0.11507335279221934,
+        0.11189425867893746,
+        0.10277548127558198,
+        0.0889018940568695,
+        0.07200917783384833,
+        0.05407161051837529,
+        0.036982494521830354,
+        0.02226527409028689,
+        0.010866599224457303,
+        0.0031062514135009396,
+        -0.001258909518015039,
+        -0.0029050919204011926,
+        -0.005392788920679466
+ ]
+taps: 25
+
+Execution time of filter update function on embedded platform (STM32H7): 70us @180MHz
+```
+
+
+
 #### IIR filter simulations
 Invocation and configuration of script is identical to RC/CR and FIR simulations. All examples bellow are described in ***iir_filter.py***.
 
@@ -163,10 +231,12 @@ This example shows signal acquire from accelerometer and RC low pass filter in w
 
 
 ## C implementation
-### RC filter
+### RC & CR filter (1st order IIR)
 There are only two functions being a part of RC filter API:
  - *filter_status_t ***filter_rc_init***(p_filter_rc_t * p_filter_inst, const float32_t fc, const float32_t dt, const uint8_t order, const float32_t init_value)*
  - *float32_t ***filter_rc_update***(p_filter_rc_t p_filter_inst, const float32_t x)*
+  - *filter_status_t ***filter_cr_init***(p_filter_cr_t * p_filter_inst, const float32_t fc, const float32_t dt, const uint8_t order, const float32_t init_value)*
+ - *float32_t ***filter_cr_update***(p_filter_cr_t p_filter_inst, const float32_t x)*
 
  ##### Example of usage
 
@@ -195,6 +265,52 @@ loop @SAMPLE_TIME
 
 ```
 
+
+### FIR filter
+There are only two functions being a part of RC filter API:
+ - filter_status_t ***filter_fir_init***(p_filter_fir_t * p_filter_inst, const float32_t *p_a, const uint8_t order)
+ - float32_t ***filter_fir_update***(p_filter_fir_t p_filter_inst, const float32_t x)
+
+
+ ##### Example of usage
+```C
+// 1. Declare filter instance
+p_filter_fir_t gp_filter_fir;
+
+/* 2. Prepare FIR coefficients
+* NOTE: Use fir_filter.py sript or external tool to get FIR coefficients.
+*/
+const float32_t gf_fir_coef[9] =
+{   0.02341152899192398f,
+    0.06471122356467367f,
+    0.12060371719780817f,
+    0.16958710211144923f,
+    0.1891554348168665f,
+    0.16958710211144923f,
+    0.12060371719780817f,
+    0.06471122356467367f,
+    0.02341152899192398f
+};
+
+/* 
+*   3. Init FIR filter with following parameters
+*/ 
+if ( eFILTER_OK != filter_fir_init( &gp_filter_fir, &gf_fir_coeff, 9 ))
+{
+    // Filter init failed
+    // Further actions here...
+}
+
+// 3. Apply filter in period of SAMPLE_TIME
+loop @SAMPLE_TIME
+{
+    // Update filter
+    filtered_signal = filter_fir_update( gp_filter_fir, raw_signal );
+}
+
+```
+
+
 ## TODO
  - [x] Evaluation of RC filter in python
  - [x] Evaluation of CR filter in python
@@ -204,7 +320,7 @@ loop @SAMPLE_TIME
  - [x] Evaluation of IIR filter (LPF, HPF, notch) in python   
  - [x] Make filter_csv.py configurable via argparse
  - [ ] Add row selection to filter_csv.py
- - [ ] Implementation of FIR filter in C   
+ - [x] Implementation of FIR filter in C   
  - [ ] Implementation of IIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
