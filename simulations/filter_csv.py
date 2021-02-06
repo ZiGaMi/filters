@@ -18,6 +18,7 @@ import numpy as np
 
 from rc_filter import RC_LPF, CR_HPF
 from fir_filter import FIR
+from iir_filter import IIR
 
 # ===============================================================================
 #       CONSTANTS
@@ -101,10 +102,9 @@ if __name__ == "__main__":
 0.0031062514135009396,
 -0.001258909518015039,
 -0.0029050919204011926,
--0.005392788920679466
-
-
- ] )
+-0.005392788920679466 ] )
+	elif args["filter"] == "IIR":
+		_filter = IIR( [1.0, -1.96521693, 0.96909995], [0.00097075, 0.00194151, 0.00097075], order=2 )
 	else:
 		raise AssertionError
 

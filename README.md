@@ -243,7 +243,7 @@ There are only two functions being a part of RC filter API:
 
 ```C
 // 1. Declare filter instance
-p_filter_rc_t my_filter_inst;
+p_filter_rc_t my_filter_inst = NULL;
 
 /* 
 *   2. Init RC filter with following parameters:
@@ -276,7 +276,7 @@ There are only two functions being a part of RC filter API:
  ##### Example of usage
 ```C
 // 1. Declare filter instance
-p_filter_fir_t gp_filter_fir;
+p_filter_fir_t gp_filter_fir = NULL;
 
 /* 2. Prepare FIR coefficients
 * NOTE: Use fir_filter.py sript or external tool to get FIR coefficients.
@@ -325,6 +325,7 @@ loop @SAMPLE_TIME
  - [ ] Implementation of IIR filter in C   
  - [ ] Evaluation of washout filter in python
  - [ ] Implementation of washout filter in C
+ - [ ] Implementation of intergrator in C
 
 
     
