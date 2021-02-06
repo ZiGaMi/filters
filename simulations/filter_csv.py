@@ -17,6 +17,7 @@ from scipy.fft import rfft, rfftfreq
 import numpy as np
 
 from rc_filter import RC_LPF, CR_HPF
+from fir_filter import FIR
 
 # ===============================================================================
 #       CONSTANTS
@@ -41,9 +42,9 @@ parser = argparse.ArgumentParser( 	description="This script is for evaluation of
 # Add arguments
 parser.add_argument("-f", "--file",			help="file to analyze", 						type=str, 	required=True)
 parser.add_argument("-fs", "--sample_freq",	help="sample time in Hz", 						type=float, required=True)
-parser.add_argument("-fc", "--cutoff_freq",	help="cutoff freq in Hz", 						type=float, required=True)
+parser.add_argument("-fc", "--cutoff_freq",	help="cutoff freq in Hz", 						type=float, required=False)
 parser.add_argument("-fl", "--filter", 		help="type of filter. Options: 'RC', 'CR'", 	type=str, 	required=True)
-parser.add_argument("-or", "--order", 		help="order of filter", 						type=int, 	required=True)
+parser.add_argument("-or", "--order", 		help="order of filter", 						type=int, 	required=False)
 
 # Get args
 args = parser.parse_args()
@@ -75,6 +76,35 @@ if __name__ == "__main__":
 		_filter = RC_LPF( args["cutoff_freq"], _ts, args["order"] )
 	elif args["filter"] == "CR":
 		_filter = CR_HPF( args["cutoff_freq"], _ts, args["order"] )
+	elif args["filter"] == "FIR":
+		_filter = FIR( 25, [-0.005392788920679466,
+-0.0029050919204011926,
+-0.001258909518015039,
+0.0031062514135009396,
+0.010866599224457303,
+0.02226527409028689,
+0.036982494521830354,
+0.05407161051837529,
+0.07200917783384833,
+0.0889018940568695,
+0.10277548127558198,
+0.11189425867893746,
+0.11507335279221934,
+0.11189425867893746,
+0.10277548127558198,
+0.0889018940568695,
+0.07200917783384833,
+0.05407161051837529,
+0.036982494521830354,
+0.02226527409028689,
+0.010866599224457303,
+0.0031062514135009396,
+-0.001258909518015039,
+-0.0029050919204011926,
+-0.005392788920679466
+
+
+ ] )
 	else:
 		raise AssertionError
 
