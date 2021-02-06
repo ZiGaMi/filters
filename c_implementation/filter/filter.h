@@ -36,7 +36,6 @@ typedef enum
 	eFILTER_ERROR		= 0x01,		/**<General error */
 } filter_status_t;
 
-
 /**
  * 	RC filter instance type
  */
@@ -66,7 +65,7 @@ filter_status_t filter_cr_init		(p_filter_cr_t * p_filter_inst, const float32_t 
 float32_t 		filter_cr_update	(p_filter_cr_t filter_inst, const float32_t x);
 filter_status_t filter_fir_init		(p_filter_fir_t * p_filter_inst, const float32_t * p_a, const uint32_t order);
 float32_t		filter_fir_update	(p_filter_fir_t filter_inst, const float32_t x);
-filter_status_t filter_iir_init		(p_filter_iir_t * p_filter_inst, const float32_t * p_a, const float32_t * p_b, const float32_t a_size, const float32_t b_size);
+filter_status_t filter_iir_init		(p_filter_iir_t * p_filter_inst, const float32_t * p_a, const float32_t * p_b, const uint32_t a_size, const uint32_t b_size);
 float32_t		filter_iir_update	(p_filter_iir_t filter_inst, const float32_t x);
 
 

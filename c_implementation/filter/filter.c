@@ -64,9 +64,9 @@ typedef struct filter_cr_s
  */
 typedef struct filter_fir_s
 {
-	p_ring_buffer_t  	p_x;		/**<Previous values of input filter */
-	float32_t 		*	p_a;		/**<Filter coefficients */
-	uint32_t			order;		/**<Number of FIR filter taps - order of filter */
+	p_ring_buffer_t   p_x;		/**<Previous values of input filter */
+	float32_t 		* p_a;		/**<Filter coefficients */
+	uint32_t		  order;	/**<Number of FIR filter taps - order of filter */
 } filter_fir_t;
 
 /**
@@ -326,7 +326,6 @@ filter_status_t filter_fir_init(p_filter_fir_t * p_filter_inst, const float32_t 
 	return status;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /**
 *   Update FIR filter
@@ -341,37 +340,140 @@ float32_t filter_fir_update(p_filter_fir_t filter_inst, const float32_t x)
 	float32_t y = 0.0f;
 	uint32_t i;
 
-	// Add new sample to buffer
-	ring_buffer_add_f( filter_inst->p_x, x );
-
-	// Make convolution
-	for ( i = 0; i < filter_inst -> order; i++ )
+	if ( NULL != filter_inst )
 	{
-		y += ( filter_inst->p_a[i] * ring_buffer_get_f( filter_inst->p_x, -i ));
+		// Add new sample to buffer
+		ring_buffer_add_f( filter_inst->p_x, x );
+
+		// Make convolution
+		for ( i = 0; i < filter_inst -> order; i++ )
+		{
+			y += ( filter_inst->p_a[i] * ring_buffer_get_f( filter_inst->p_x, (( -i ) - 1 )));
+		}
 	}
 
 	return y;
 }
 
-
-filter_status_t filter_iir_init(p_filter_iir_t * p_filter_inst, const float32_t * p_a, const float32_t * p_b, const float32_t a_size, const float32_t b_size)
+////////////////////////////////////////////////////////////////////////////////
+/**
+*   Initialize IIR filter
+*
+*   General IIR filter difference equation:
+*
+*   	y[n] = 1/a[0] * ( SUM( b[i] * x[n-i]) - ( SUM( a[i+1] * y[n-i-1] )))
+*
+*
+*   General IIR impulse response in time discrete space:
+*
+*   	H(z) = ( b0 + b1*z^-1 + b2*z^-2 + ... bn*z^(-n-1) ) / ( a0 + a1*z^-1 + a2*z^-2 + ... an*z^(-n-1)),
+*
+*   		where: 	a - filter poles,
+*   				b - filter zeros
+*
+* @note Make sure that a[0] is non-zero value as it can later result in division by zero error!
+*
+*
+* @param[in] 	p_filter_inst	- Pointer to IIR filter instance
+* @param[in] 	p_a				- Pointer to IIR pole
+* @param[in] 	p_b				- Pointer to IIR zeros
+* @param[in] 	a_size			- Number of poles
+* @param[in] 	b_size			- Number of zeros
+* @return 		status			- Status of operation
+*/
+////////////////////////////////////////////////////////////////////////////////
+filter_status_t filter_iir_init(p_filter_iir_t * p_filter_inst, const float32_t * p_a, const float32_t * p_b, const uint32_t a_size, const uint32_t b_size)
 {
-	filter_status_t status = eFILTER_OK;
+	filter_status_t 		status 		= eFILTER_OK;
+	ring_buffer_status_t 	buf_status 	= eRING_BUFFER_OK;
 
+	if (( NULL != p_filter_inst ) && ( a_size > 0UL ) && ( b_size > 0UL ))
+	{
+		// Allocate filter space
+		*p_filter_inst = malloc( sizeof( filter_iir_t ));
+
+		// Allocation succeed
+		if ( NULL != *p_filter_inst )
+		{
+			// Create ring buffers
+			buf_status = ring_buffer_init( &(*p_filter_inst)->p_x, b_size );
+			buf_status |= ring_buffer_init( &(*p_filter_inst)->p_y, a_size );
+
+			// Create ring buffer
+			if ( eRING_BUFFER_OK == buf_status )
+			{
+				// Get filter coefficient & order
+				(*p_filter_inst)->p_a = (float32_t*) p_a;
+				(*p_filter_inst)->p_b = (float32_t*) p_b;
+				(*p_filter_inst)->a_size = a_size;
+				(*p_filter_inst)->b_size = b_size;
+			}
+			else
+			{
+				status = eFILTER_ERROR;
+			}
+		}
+		else
+		{
+			status = eFILTER_ERROR;
+		}
+	}
+	else
+	{
+		status = eFILTER_ERROR;
+	}
 
 	return status;
 }
 
-
+////////////////////////////////////////////////////////////////////////////////
+/**
+*   Update IIR filter
+*
+*@note: In case that a[0] is zero, NAN is returned!
+*
+* @param[in] 	filter_inst	- Pointer to IIR filter instance
+* @param[in] 	x			- Input value
+* @return 		y			- Output value
+*/
+////////////////////////////////////////////////////////////////////////////////
 float32_t filter_iir_update(p_filter_iir_t filter_inst, const float32_t x)
 {
 	float32_t y = 0.0f;
+	uint32_t i;
 
+	if ( NULL != filter_inst )
+	{
+		// Add new input to buffer
+		ring_buffer_add_f( filter_inst->p_x, x );
 
+		// Calculate filter value
+		for ( i = 0; i < filter_inst->b_size; i++ )
+		{
+			y += ( filter_inst->p_b[i] * ring_buffer_get_f( filter_inst->p_x, (( -i ) - 1 )));
+		}
+
+		for ( i = 1; i < filter_inst->a_size; i++ )
+		{
+			y -= ( filter_inst->p_a[i] * ring_buffer_get_f( filter_inst->p_y, -i ));
+		}
+
+		// Check division by
+		if ( filter_inst->p_a[0] == 0.0f )
+		{
+			y = NAN;
+		}
+		else
+		{
+			y = ( y / filter_inst->p_a[0] );
+		}
+
+		// Add new output to buffer
+		ring_buffer_add_f( filter_inst->p_y, y );
+	}
 
 	return y;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /**

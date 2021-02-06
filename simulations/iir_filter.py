@@ -64,7 +64,7 @@ HPF_FC_2 = 1.0
 HPF_FC_BUTTER = 1.0
 HPF_FC_CHEBY = 1.0
 
-LPF_FC_1 = 1.0
+LPF_FC_1 = 10.0
 LPF_FC_2 = 1.0
 
 LPF_FC_BUTTER = 1.0
@@ -78,8 +78,8 @@ LPF_FC_CHEBY = 1.0
 HPF_Z_1 = .25
 HPF_Z_2 = 0.701
 
-LPF_Z_1 = .25
-LPF_Z_2 = 1.0
+LPF_Z_1 = 1.0
+LPF_Z_2 = 10.0
 
 ## ****** END OF USER CONFIGURATIONS ******
 
