@@ -185,13 +185,6 @@ Invocation and configuration of script is identical to RC/CR and FIR simulations
 ##### 2nd order LPF
 ![](simulations/pics/iir_lpf_2nd_order_filter_simulation_example.png)
 
-##### 2nd order HPF
-![](simulations/pics/iir_hpf_2nd_order_filter_simulation_example.png)
-
-##### 2nd order notch
-Notch filter is specialy designed to filter AC freuqency of 50Hz. Base input signal is 1Hz with added AC noise.
-![](simulations/pics/notch_filter_simulation_example.png)
-
 ##### C implementation tests
 
 Following two examples shows IIR filters in action where online acceleration data is being filtered with low pass 2nd order IIR filter. In first example cutoff frequency was set to 1Hz and in second 10Hz with sample frequency of 50Hz. Accelerometer was placed on top of steward platform in order to make equivalent test by controling movement of accelerometer.
@@ -212,7 +205,7 @@ C implementation:
 Python simulation:
 ![](simulations/pics/IIR_evaluation/iir_evaulation_on_real_data_1.png)
 
-Detailed desription of filter used in example above:
+Detailed description of filter used in example above:
 ```
 ********************************************************
  EVALUATION OF IIR FILTER
@@ -242,6 +235,41 @@ zeta = 1.0
 exe. time: 22us @180MHz (STM32H7)
 ```
 
+##### 2nd order HPF
+![](simulations/pics/iir_hpf_2nd_order_filter_simulation_example.png)
+
+##### 2nd order notch
+Notch filter is specialy designed to filter AC freuqency of 50Hz. Base input signal is 1Hz with added AC noise.
+![](simulations/pics/notch_filter_simulation_example.png)
+
+##### C implementation tests
+Single test was perform where 1Hz sine signal was added 10Hz noise signal. Notch filter in that test was 2nd order with fc=10Hz and r=0.95.
+
+Python simulation:
+![](simulations/pics/IIR_evaluation/iir_notch_evaulation_simulation_0.png)
+
+C implementation:
+![](simulations/pics/IIR_evaluation/iir_notch_evaluation_on_embedded_0.png)
+
+```
+********************************************************
+ EVALUATION OF IIR NOTCH FILTER
+******************************************************** 
+ 
+Coefficient were calculated by iir_filters.py
+
+================================================================
+EXAMPLE 0:
+================================================================
+
+Coefficient of notch filters used in test:
+notch_a: [1, -1.496681439593653, 0.8556250000000001]
+notch_b: [1, -1.618033988749895, 1]
+fnotch = 10Hz
+r = 0.95
+fs = 100Hz
+exe. time: 22us @180MHz (STM32H7)
+```
 
 #### Reading signal from CSV file
 Analysing raw signals store in CSV file can be done via ***filter_csv.py*** script. For help invoke with -h argument.

@@ -242,8 +242,8 @@ if __name__ == "__main__":
     lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
     # Calculate coefficient for 2nd order notch filter
-    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.925 )
-    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 50.0, SAMPLE_FREQ, r=0.90 )
+    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.925 )
+    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.90 )
 
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
     b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
@@ -282,6 +282,8 @@ if __name__ == "__main__":
     print("lpf_b: %s" % lpf_b)
     print("a_b_lpf: %s" % a_b_lpf)
     print("b_b_lpf: %s" % b_b_lpf)
+    print("notch_a: %s" % notch_a)
+    print("notch_b: %s" % notch_b)
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -298,7 +300,7 @@ if __name__ == "__main__":
 
     # Generate inputs
     _fg_sine = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "sine" )
-    _fg_ac_noise = FunctionGenerator( 50.0, 0.2, 0, 0, "sine" )
+    _fg_ac_noise = FunctionGenerator( 10.0, 0.2, 0, 0, "sine" )
     _fg_rect = FunctionGenerator( INPUT_SIGNAL_FREQ, INPUT_SIGNAL_AMPLITUDE, INPUT_SIGNAL_OFFSET, INPUT_SIGNAL_PHASE, "rect" )
     _sin_x = []
     _rect_x = []
