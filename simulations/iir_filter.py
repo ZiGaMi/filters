@@ -64,7 +64,7 @@ HPF_FC_2 = 1.0
 HPF_FC_BUTTER = 1.0
 HPF_FC_CHEBY = 1.0
 
-LPF_FC_1 = 10.0
+LPF_FC_1 = .5
 LPF_FC_2 = 1.0
 
 LPF_FC_BUTTER = 1.0
@@ -75,10 +75,10 @@ LPF_FC_CHEBY = 1.0
 #   z = 0       -> underdamped
 #   z = 0.7071  -> criticaly damped, sweep spot
 #   z = 1       -> overdamped
-HPF_Z_1 = .25
+HPF_Z_1 = 3
 HPF_Z_2 = 0.701
 
-LPF_Z_1 = 1.0
+LPF_Z_1 = 3.0
 LPF_Z_2 = 10.0
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -110,6 +110,41 @@ def calculate_2nd_order_HPF_coeff(fc, z, fs):
 
 
 # ===============================================================================
+# @brief:   calculate 2nd order high pass filter based on following 
+#           transfer function:
+#           
+#   Equations were taken from: https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html
+#
+# @param[in]:    fc     - Corner frequenc
+# @param[in]:    z      - Damping factor
+# @param[in]:    fs     - Sample frequency
+# @return:       b,a    - Array of b,a IIR coefficients
+# ===============================================================================
+def calculate_biquad_hpf_coeff(fc, z, fs):
+
+    # Calculate omega
+    w = 2*np.pi*fc/fs
+
+    # Calculate quality factor 
+    Q = 1 / ( 2.0 * z )
+
+    # Calculate alpha
+    alpha = np.sin( w ) / ( 2.0 * Q )
+
+    # Calculate factors
+    cos_w = np.cos(w)
+
+    b0 = ( 1 + cos_w) / 2.0
+    b1 = -( 1 + cos_w )
+    b2 = ( 1 + cos_w ) / 2.0
+
+    a0 = 1 + alpha
+    a1 = -2.0 * cos_w
+    a2 = 1 - alpha
+
+    return [b0,b1,b2], [a0,a1,a2]
+
+# ===============================================================================
 # @brief:   calculate 1nd order high pass filter based on following 
 #           transfer function:
 #           
@@ -128,7 +163,6 @@ def calculate_1nd_order_HPF_coeff(fc, fs):
     b, a = bilinear( [1,0], [1,w], fs )
 
     return b, a
-
 
 # ===============================================================================
 # @brief:   calculate 2nd order low pass filter based on following 
@@ -150,6 +184,41 @@ def calculate_2nd_order_LPF_coeff(fc, z, fs):
     b, a = bilinear( [0,0,w**2], [1,2*z*w,w**2], fs )
 
     return b, a
+
+# ===============================================================================
+# @brief:   calculate 2nd order low pass filter based on following 
+#           transfer function:
+#          
+#   Equations were taken from: https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html
+#
+# @param[in]:    fc     - Corner frequenc
+# @param[in]:    z      - Damping factor
+# @param[in]:    fs     - Sample frequency
+# @return:       b,a    - Array of b,a IIR coefficients
+# ===============================================================================
+def calculate_biquad_lpf_coeff(fc, z, fs):
+
+    # Calculate omega
+    w = 2*np.pi*fc/fs
+
+    # Calculate quality factor 
+    Q = 1 / ( 2.0 * z )
+
+    # Calculate alpha
+    alpha = np.sin( w ) / ( 2.0 * Q )
+
+    # Calculate factors
+    cos_w = np.cos(w)
+
+    b0 = ( 1 - cos_w) / 2.0
+    b1 = 1 - cos_w
+    b2 = ( 1 - cos_w ) / 2.0
+
+    a0 = 1 + alpha
+    a1 = -2.0 * cos_w
+    a2 = 1 - alpha
+
+    return [b0,b1,b2], [a0,a1,a2]
 
 
 # ===============================================================================
@@ -280,6 +349,16 @@ if __name__ == "__main__":
 
     print("lpf_a: %s" % lpf_a)
     print("lpf_b: %s" % lpf_b)
+
+    biq_b, biq_a = calculate_biquad_lpf_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
+    w_lpf_2, h_lpf_2 = freqz( biq_b, biq_a, 4096 )
+
+    biq_b_hpf, biq_a_hpf = calculate_biquad_hpf_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
+    w_2, h_2 = freqz( biq_b_hpf, biq_a_hpf, 4096 )
+
+    print("biq_a: %s" % biq_a)
+    print("biq_b: %s" % biq_b)
+
     print("a_b_lpf: %s" % a_b_lpf)
     print("b_b_lpf: %s" % b_b_lpf)
     print("notch_a: %s" % notch_a)
@@ -378,8 +457,8 @@ if __name__ == "__main__":
     ax[1].plot(w,   20 * np.log10(abs(h)),   'g', label=str(HPF_FC_1) + "Hz/" + str(HPF_Z_1))
     ax[1].plot(w_2, 20 * np.log10(abs(h_2)), 'y', label=str(HPF_FC_2) + "Hz/" + str(HPF_Z_2))
     
-    ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butterworth" )
-    ax[1].plot(w_c, 20 * np.log10(abs(h_c)), 'b', label="chebysev" )
+    #ax[1].plot(w_b, 20 * np.log10(abs(h_b)), 'r', label="butterworth" )
+    #ax[1].plot(w_c, 20 * np.log10(abs(h_c)), 'b', label="chebysev" )
     
     ax[1].set_ylabel('Amplitude [dB]')
     ax[1].set_xlabel('Frequency [Hz]')
@@ -433,7 +512,7 @@ if __name__ == "__main__":
     ax2[1].set_xscale("log")
     ax2[1].legend(loc="upper right")
 
-
+    
     fig3, ax3 = plt.subplots(2, 1)
     fig3.suptitle("Notch 2nd order IIR Filter Design\nInput signal freq: " + str(INPUT_SIGNAL_FREQ) + "Hz, Sample freq (fs): " +str(SAMPLE_FREQ) + "Hz", fontsize=20)
    
