@@ -58,14 +58,14 @@ SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 ## Cutoff freqeuncy of filter
 #
 # Unit: Hz
-HPF_FC_1 = 1.0
+HPF_FC_1 = 2.5
 HPF_FC_2 = 1.0
 
 HPF_FC_BUTTER = 1.0
 HPF_FC_CHEBY = 1.0
 
-LPF_FC_1 = .5
-LPF_FC_2 = 1.0
+LPF_FC_1 = 10.5
+LPF_FC_2 = 2.5
 
 LPF_FC_BUTTER = 1.0
 LPF_FC_CHEBY = 1.0
@@ -75,10 +75,10 @@ LPF_FC_CHEBY = 1.0
 #   z = 0       -> underdamped
 #   z = 0.7071  -> criticaly damped, sweep spot
 #   z = 1       -> overdamped
-HPF_Z_1 = 3
+HPF_Z_1 = 0.34
 HPF_Z_2 = 0.701
 
-LPF_Z_1 = 3.0
+LPF_Z_1 = 0.5
 LPF_Z_2 = 10.0
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
     # Calculate coefficient for 2nd order notch filter
-    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.925 )
+    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.90 )
     notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.90 )
 
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
@@ -352,6 +352,8 @@ if __name__ == "__main__":
 
     print("biq_a: %s" % biq_a)
     print("biq_b: %s" % biq_b)
+    print("biq_a_hpf: %s" % biq_a_hpf)
+    print("biq_b_hpf: %s" % biq_b_hpf)
 
     print("a_b_lpf: %s" % a_b_lpf)
     print("b_b_lpf: %s" % b_b_lpf)
