@@ -125,11 +125,8 @@ def calculate_biquad_hpf_coeff(fc, z, fs):
     # Calculate omega
     w = 2*np.pi*fc/fs
 
-    # Calculate quality factor 
-    Q = 1 / ( 2.0 * z )
-
     # Calculate alpha
-    alpha = np.sin( w ) / ( 2.0 * Q )
+    alpha = np.sin( w ) * z
 
     # Calculate factors
     cos_w = np.cos(w)
@@ -201,11 +198,8 @@ def calculate_biquad_lpf_coeff(fc, z, fs):
     # Calculate omega
     w = 2*np.pi*fc/fs
 
-    # Calculate quality factor 
-    Q = 1 / ( 2.0 * z )
-
     # Calculate alpha
-    alpha = np.sin( w ) / ( 2.0 * Q )
+    alpha = np.sin( w ) * z
 
     # Calculate factors
     cos_w = np.cos(w)
@@ -501,8 +495,8 @@ if __name__ == "__main__":
 
     ax2[1].plot(w_lpf, 20 * np.log10(abs(h_lpf)),       'g', label=str(LPF_FC_1) + "Hz/" + str(LPF_Z_1) )
     ax2[1].plot(w_lpf_2, 20 * np.log10(abs(h_lpf_2)),   'y', label=str(LPF_FC_2) + "Hz/" + str(LPF_Z_2) )
-    ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)),   'r', label="butterworth" )
-    ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)),   'b', label="chebysev" )
+    #ax2[1].plot(w_b_lpf, 20 * np.log10(abs(h_b_lpf)),   'r', label="butterworth" )
+    #ax2[1].plot(w_c_lpf, 20 * np.log10(abs(h_c_lpf)),   'b', label="chebysev" )
 
     ax2[1].set_ylabel('Amplitude [dB]')
     ax2[1].set_xlabel('Frequency [Hz]')
