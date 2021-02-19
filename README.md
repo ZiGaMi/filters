@@ -6,6 +6,7 @@ RC/CR filter C implementation support also cascading filter but user shall notic
 
 For both FIR and IIR C implementation filters coefficients must be defined at initialization time and are subject to application needs. C functions are prepared only to intake filter coefficient and therefore user shall use externla tools to evaluate appropriate filter for application and to acquire it's coefficients. Although 2nd order LPF, HPF and notch filter coefficients can be obtain from ***iir_filter.py*** script under /simulation directory. Similar to IIR filter, FIR filter coefficient can be calcualted with ***fir_filter.py*** script, with none or small changes applied.
 
+C code release of filters can be found by separete repository: [C filter repository](https://github.com/Misc-library-for-DSP/filter) 
 
 ## List of all filters
  - RC filter (IIR 1st order LPF)

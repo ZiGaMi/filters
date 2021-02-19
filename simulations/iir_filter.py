@@ -64,8 +64,8 @@ HPF_FC_2 = 1.0
 HPF_FC_BUTTER = 1.0
 HPF_FC_CHEBY = 1.0
 
-LPF_FC_1 = 10.5
-LPF_FC_2 = 2.5
+LPF_FC_1 = 1
+LPF_FC_2 = 1
 
 LPF_FC_BUTTER = 1.0
 LPF_FC_CHEBY = 1.0
@@ -75,11 +75,11 @@ LPF_FC_CHEBY = 1.0
 #   z = 0       -> underdamped
 #   z = 0.7071  -> criticaly damped, sweep spot
 #   z = 1       -> overdamped
-HPF_Z_1 = 0.34
+HPF_Z_1 = 1.0
 HPF_Z_2 = 0.701
 
-LPF_Z_1 = 0.5
-LPF_Z_2 = 10.0
+LPF_Z_1 = 1.0
+LPF_Z_2 = 1.0
 
 ## ****** END OF USER CONFIGURATIONS ******
 
@@ -214,6 +214,23 @@ def calculate_biquad_lpf_coeff(fc, z, fs):
 
     return [b0,b1,b2], [a0,a1,a2]
 
+def calculate_lpf_gain(zero, pole):
+    sum_zero = 0
+    sum_pole = 0
+
+    for z in zero:
+        sum_zero += z
+    
+    for i, p in enumerate(pole):
+        if i > 0:
+            sum_pole += p
+
+    try:
+        gain = ( sum_zero / ( 1 + ( sum_pole / pole[0] ))) / pole[0]
+    except ZeroDivisionError:
+        gain = -10000
+
+    return gain
 
 # ===============================================================================
 # @brief:   calculate 2nd order notch filter. This code is from 
@@ -301,12 +318,17 @@ if __name__ == "__main__":
     b_2, a_2    = calculate_2nd_order_HPF_coeff( HPF_FC_2, HPF_Z_2, SAMPLE_FREQ )
     
     # Calculate coefficient for 2nd order LPF
-    lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
+    #lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
+    lpf_b, lpf_a        = calculate_biquad_lpf_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
+    
+    #dc_gain = calculate_lpf_gain( lpf_b, lpf_a )
+    #lpf_b = [b/dc_gain for b in lpf_b]
+
     lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
     # Calculate coefficient for 2nd order notch filter
-    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.90 )
-    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.90 )
+    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.80 )
+    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.99 )
 
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
     b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
@@ -326,6 +348,12 @@ if __name__ == "__main__":
     w_c_lpf, h_c_lpf = freqz( b_c_lpf, a_c_lpf, 4096 )
     
     w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
+    """
+    dc_gain = calculate_lpf_gain( lpf_b, lpf_a )
+    lpf_b = [b/dc_gain for b in lpf_b]
+    w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
+    """
+
     w_lpf_2, h_lpf_2 = freqz( lpf_b_2, lpf_a_2, 4096 )
 
     w_notch, h_notch = freqz( notch_b, notch_a, 4096 )
@@ -344,6 +372,8 @@ if __name__ == "__main__":
     print("lpf_a: %s" % lpf_a)
     print("lpf_b: %s" % lpf_b)
 
+    print("gain lpf: %s" % ( calculate_lpf_gain(lpf_b, lpf_a)))
+
     biq_b, biq_a = calculate_biquad_lpf_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
     w_lpf_2, h_lpf_2 = freqz( biq_b, biq_a, 4096 )
 
@@ -352,11 +382,15 @@ if __name__ == "__main__":
 
     print("biq_a: %s" % biq_a)
     print("biq_b: %s" % biq_b)
+    print("gain biq lpf: %s" % ( calculate_lpf_gain(biq_b, biq_a)))
+
     print("biq_a_hpf: %s" % biq_a_hpf)
     print("biq_b_hpf: %s" % biq_b_hpf)
 
     print("a_b_lpf: %s" % a_b_lpf)
     print("b_b_lpf: %s" % b_b_lpf)
+    print("gain b_lpf: %s" % ( calculate_lpf_gain(b_b_lpf, a_b_lpf)))
+
     print("notch_a: %s" % notch_a)
     print("notch_b: %s" % notch_b)
 
