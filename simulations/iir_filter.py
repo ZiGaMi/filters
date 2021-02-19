@@ -58,8 +58,8 @@ SAMPLE_NUM = int(( IDEAL_SAMPLE_FREQ * TIME_WINDOW ) + 1.0 )
 ## Cutoff freqeuncy of filter
 #
 # Unit: Hz
-HPF_FC_1 = 2.5
-HPF_FC_2 = 1.0
+HPF_FC_1 = 1
+HPF_FC_2 = 1
 
 HPF_FC_BUTTER = 1.0
 HPF_FC_CHEBY = 1.0
@@ -76,7 +76,7 @@ LPF_FC_CHEBY = 1.0
 #   z = 0.7071  -> criticaly damped, sweep spot
 #   z = 1       -> overdamped
 HPF_Z_1 = 1.0
-HPF_Z_2 = 0.701
+HPF_Z_2 = 1.0
 
 LPF_Z_1 = 1.0
 LPF_Z_2 = 1.0
@@ -214,6 +214,27 @@ def calculate_biquad_lpf_coeff(fc, z, fs):
 
     return [b0,b1,b2], [a0,a1,a2]
 
+# ===============================================================================
+# @brief:   calculate LPF IIR filter DC frequency gain
+#          
+#   Equations were taken from: 
+# 
+#   "The Scientist and Engineer's Guide to Digital Signal Process" but are
+#   slitly changed.
+#
+#   As IIR filter outut is:
+# 
+#       y[n] = (( b0*x[n] + b1*x[n-1] + ... + bi*x[n-i] ) - ( a1*y[n-1] + a2*y[n-2] + ... + aj*y[n-j] )) / a0 
+#
+#   Gain @DC frequency is defined as:
+#
+#       G = 1/a0 * (( b0 + b1 + ... + bn ) / ( 1 + (( a1 + a2 + ... + an+1 ) / a0 )))
+#
+#
+# @param[in]:    zero   - Zero coefficients
+# @param[in]:    pole   - Pole coefficients
+# @return:       gain   - Gain of filter @DC frequency
+# ===============================================================================
 def calculate_lpf_gain(zero, pole):
     sum_zero = 0
     sum_pole = 0
@@ -228,7 +249,46 @@ def calculate_lpf_gain(zero, pole):
     try:
         gain = ( sum_zero / ( 1 + ( sum_pole / pole[0] ))) / pole[0]
     except ZeroDivisionError:
-        gain = -10000
+        gain = None
+
+    return gain
+
+# ===============================================================================
+# @brief:   calculate HPF IIR filter 0.5 normalised frequency gain
+#          
+#   Equations were taken from: 
+# 
+#   "The Scientist and Engineer's Guide to Digital Signal Process" but are
+#   slitly changed.
+#
+#   As IIR filter outut is:
+# 
+#       y[n] = (( b0*x[n] + b1*x[n-1] + ... + bi*x[n-i] ) - ( a1*y[n-1] + a2*y[n-2] + ... + aj*y[n-j] )) / a0 
+#
+#   Gain @0.5 normalized frequency is defined as:
+#
+#       G = 1/a0 * (( b0 - b1 + b2 - b3 +... + bn ) / ( 1 + (( a1 - a2 + a3 - a4 + ... + an+1 ) / a0 )))
+#
+#
+# @param[in]:    zero   - Zero coefficients
+# @param[in]:    pole   - Pole coefficients
+# @return:       gain   - Gain of filter @0.5 normalized frequency
+# ===============================================================================
+def calculate_hpf_gain(zero, pole):
+    sum_zero = 0
+    sum_pole = 0
+
+    for i, z in enumerate(zero):
+        sum_zero += ((-1)**i ) * z
+    
+    for i, p in enumerate(pole):
+        if i > 0:
+            sum_pole += ((-1)**i ) * p
+
+    try:
+        gain = ( sum_zero / ( 1 + ( sum_pole / pole[0] ))) / pole[0]
+    except ZeroDivisionError:
+        gain = None
 
     return gain
 
@@ -267,6 +327,19 @@ def calculate_2nd_order_notch_coeff(fc, fs, r):
 ## IIR Filter
 class IIR:
 
+    # ===============================================================================
+    # @brief:   Create IIR instance
+    #   
+    #       This constructor creates two circular (ring) buffers where input 
+    #       and output of filter are being stored.
+    #
+    # @note That implementation only support same number of poles & zeros!
+    #
+    # @param[in]:    a      - Pole coefficients
+    # @param[in]:    b      - Zero coefficients
+    # @param[in]:    order  - Filter order (size of pole/zeros)
+    # @return:       void
+    # ===============================================================================
     def __init__(self, a, b, order):
 
         # Store tap number and coefficient
@@ -279,6 +352,16 @@ class IIR:
         self.y = CircBuffer(order+1)
 
 
+    # ===============================================================================
+    # @brief:   Update IIR filter
+    #
+    #   Following equation is being calculated:
+    #
+    #       y[n] = (( b0*x[n] + b1*x[n-1] + ... + bi*x[n-i] ) - ( a1*y[n-1] + a2*y[n-2] + ... + aj*y[n-j] )) / a0 
+    #
+    # @param[in]:    x  - Input data
+    # @return:       y  - Filtered input
+    # ===============================================================================
     def update(self, x):
         
         # Fill input
@@ -314,21 +397,34 @@ if __name__ == "__main__":
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
     # Calculate coefficient for 2nd order HPF
-    b, a        = calculate_2nd_order_HPF_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
+    b, a        = calculate_biquad_hpf_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
     b_2, a_2    = calculate_2nd_order_HPF_coeff( HPF_FC_2, HPF_Z_2, SAMPLE_FREQ )
+
+    # Calculate filter gain @0.5 norm freq
+    print("IIR 2nd order HPF1 coeff: zero=%s, pole=%s" % ( b, a ))
+    print("IIR 2nd order HPF1 gain: %s\n" % calculate_hpf_gain( b, a ))
+
+    print("IIR 2nd order HPF2 coeff: zero=%s, pole=%s" % ( b_2, a_2 ))
+    print("IIR 2nd order HPF2 gain: %s\n" % calculate_hpf_gain( b_2, a_2 ))
     
     # Calculate coefficient for 2nd order LPF
-    #lpf_b, lpf_a        = calculate_2nd_order_LPF_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
     lpf_b, lpf_a        = calculate_biquad_lpf_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
-    
-    #dc_gain = calculate_lpf_gain( lpf_b, lpf_a )
-    #lpf_b = [b/dc_gain for b in lpf_b]
-
     lpf_b_2, lpf_a_2    = calculate_2nd_order_LPF_coeff( LPF_FC_2, LPF_Z_2, SAMPLE_FREQ )
 
+    # Print caluclated coefficient and filter gain @DC freq
+    print("IIR 2nd order LPF1 coeff: zero=%s, pole=%s" % ( lpf_b, lpf_a ))
+    print("IIR 2nd order LPF1 gain: %s\n" % calculate_lpf_gain( lpf_b, lpf_a ))
+
+    print("IIR 2nd order LPF2 coeff: zero=%s, pole=%s" % ( lpf_b_2, lpf_a_2 ))
+    print("IIR 2nd order LPF2 gain: %s\n" % calculate_lpf_gain( lpf_b_2, lpf_a_2 ))
+
     # Calculate coefficient for 2nd order notch filter
-    notch_b, notch_a   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.80 )
-    notch_b_2, notch_a_2   = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.99 )
+    notch_b, notch_a        = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.80 )
+    notch_b_2, notch_a_2    = calculate_2nd_order_notch_coeff( 10.0, SAMPLE_FREQ, r=0.99 )
+
+    print("IIR 2nd order NOTCH1 coeff: zero=%s, pole=%s" % ( notch_b, notch_a ))
+    print("IIR 2nd order NOTCH2 coeff: zero=%s, pole=%s" % ( notch_b_2, notch_a_2 ))
+
 
     # Calculate coefficient for 2nd order Butterworth & Chebyshev filter
     b_b, a_b = butter( N=2, Wn=HPF_FC_BUTTER, btype="highpass", analog=False, fs=SAMPLE_FREQ )
@@ -348,12 +444,6 @@ if __name__ == "__main__":
     w_c_lpf, h_c_lpf = freqz( b_c_lpf, a_c_lpf, 4096 )
     
     w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
-    """
-    dc_gain = calculate_lpf_gain( lpf_b, lpf_a )
-    lpf_b = [b/dc_gain for b in lpf_b]
-    w_lpf, h_lpf = freqz( lpf_b, lpf_a, 4096 )
-    """
-
     w_lpf_2, h_lpf_2 = freqz( lpf_b_2, lpf_a_2, 4096 )
 
     w_notch, h_notch = freqz( notch_b, notch_a, 4096 )
@@ -368,31 +458,6 @@ if __name__ == "__main__":
 
     _filter_IIR_NOTCH = IIR( notch_a, notch_b, order=2 ) 
     _filter_IIR_NOTCH_2 = IIR( notch_a_2, notch_b_2, order=2 ) 
-
-    print("lpf_a: %s" % lpf_a)
-    print("lpf_b: %s" % lpf_b)
-
-    print("gain lpf: %s" % ( calculate_lpf_gain(lpf_b, lpf_a)))
-
-    biq_b, biq_a = calculate_biquad_lpf_coeff( LPF_FC_1, LPF_Z_1, SAMPLE_FREQ )
-    w_lpf_2, h_lpf_2 = freqz( biq_b, biq_a, 4096 )
-
-    biq_b_hpf, biq_a_hpf = calculate_biquad_hpf_coeff( HPF_FC_1, HPF_Z_1, SAMPLE_FREQ )
-    w_2, h_2 = freqz( biq_b_hpf, biq_a_hpf, 4096 )
-
-    print("biq_a: %s" % biq_a)
-    print("biq_b: %s" % biq_b)
-    print("gain biq lpf: %s" % ( calculate_lpf_gain(biq_b, biq_a)))
-
-    print("biq_a_hpf: %s" % biq_a_hpf)
-    print("biq_b_hpf: %s" % biq_b_hpf)
-
-    print("a_b_lpf: %s" % a_b_lpf)
-    print("b_b_lpf: %s" % b_b_lpf)
-    print("gain b_lpf: %s" % ( calculate_lpf_gain(b_b_lpf, a_b_lpf)))
-
-    print("notch_a: %s" % notch_a)
-    print("notch_b: %s" % notch_b)
 
     # Filter input/output
     _x = [ 0 ] * SAMPLE_NUM
@@ -566,9 +631,6 @@ if __name__ == "__main__":
     ax3[1].set_ylabel('Amplitude [dB]')
     ax3[1].set_xlabel('Frequency [Hz]')
     ax3[1].grid()
-    #ax3[1].set_ylim(-80, 20)
-    #ax3[1].set_xlim(0.001, SAMPLE_FREQ/4)
-    #ax3[1].set_xscale("log")
     ax3[1].legend(loc="upper right")
 
     plt.show()
