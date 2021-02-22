@@ -24,7 +24,7 @@ import numpy as np
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 200.0
+SAMPLE_FREQ = 50.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 1.0
+TIME_WINDOW = 3.14
 
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -55,7 +55,7 @@ class SimpleIntegrator:
         self.dt = 1 / fs
 
     def update(self, x):
-        self.y += x# * self.dt
+        self.y += x * self.dt
         return self.y
 
     def get(self):
@@ -71,7 +71,7 @@ class TrapezoidIntegrator:
         self.dt = 1 / fs
 
     def update(self, x):
-        self.y += 0.5*( x + self.x_prev )# * self.dt
+        self.y += ( x + self.x_prev ) * self.dt / 2.0
         self.x_prev = x
         return self.y
 
@@ -89,7 +89,7 @@ class KeplerIntegrator:
         self.dt = 1 / fs
 
     def update(self, x):
-        self.y += ((1/6) * ( x + 4*self.x_prev_1 + self.x_prev_2 ))# * self.dt
+        self.y += ( x + 4*self.x_prev_1 + self.x_prev_2 ) * self.dt/6
         self.x_prev_2 = self.x_prev_1
         self.x_prev_1 = x
         return self.y 
@@ -112,10 +112,18 @@ if __name__ == "__main__":
     _trap_int = TrapezoidIntegrator( fs=SAMPLE_FREQ )
     _kepler_int = KeplerIntegrator( fs=SAMPLE_FREQ )    
 
+    _ideal_simple_int = SimpleIntegrator( fs=IDEAL_SAMPLE_FREQ )
+    _ideal_trap_int = TrapezoidIntegrator( fs=IDEAL_SAMPLE_FREQ )
+    _ideal_kepler_int = KeplerIntegrator( fs=IDEAL_SAMPLE_FREQ )    
+
     # Integrals to plot
     _d_simple_int = [0]
     _d_trap_int = [0]
     _d_kepler_int = [0]
+
+    _i_simple_int = []
+    _i_trap_int = []
+    _i_kepler_int = []
 
     # Signal to integrate
     _x_d = [0]
@@ -128,13 +136,12 @@ if __name__ == "__main__":
     _downsamp_cnt = 0
     _downsamp_samp = [0]
     _d_time = [0]
-
-
  
     # Apply filter
     for n in range(SAMPLE_NUM):
         
-        
+        input = np.sin( 2*_time[n] )
+
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
             _downsamp_cnt = 0
@@ -143,23 +150,33 @@ if __name__ == "__main__":
             _downsamp_samp.append(0)
             _d_time.append( _time[n])    
 
-            #_x_d.append( _d_time[-1]**2 )
-            #_x_d.append( 1 )
-           
-
-            #input = ( K * _d_time[-1] ) + N
-            input = np.sin( 2*np.pi*.5 * _d_time[-1] )
-
             # Perform integration
-            _d_simple_int.append( _simple_int.update( input ))
-            _d_trap_int.append( _trap_int.update( input ))
-            _d_kepler_int.append( _kepler_int.update( input ))
+            _simple_int.update( input )
+            _trap_int.update( input )
+            _kepler_int.update( input )
 
+            # Store data            
+            _d_simple_int.append( _simple_int.get())
+            _d_trap_int.append( _trap_int.get())
+            _d_kepler_int.append( _kepler_int.get())
 
+            # Discrete input
             _x_d.append( input )
 
         else:
             _downsamp_cnt += 1
+
+        # ============================================
+        # IDEAL SAMPLING FREQUENCY
+        # ============================================
+
+        _ideal_simple_int.update( input )
+        _ideal_trap_int.update( input )
+        _ideal_kepler_int.update( input )
+
+        _i_simple_int.append( _ideal_simple_int.get())
+        _i_trap_int.append( _ideal_trap_int.get())
+        _i_kepler_int.append( _ideal_kepler_int.get())
     
 
     print("Simple integral: %s" % _simple_int.get() )
@@ -189,16 +206,26 @@ if __name__ == "__main__":
 
     # Subplot 0
     ax[0].plot(_d_time, _x_d, "w")
-    ax[1].plot(_d_time, _d_simple_int, "y")
-    ax[1].plot(_d_time, _d_trap_int, "b")
-    ax[1].plot(_d_time, _d_kepler_int, "r")
-    #ax[0].set_title("Input acceleration & rotation", fontsize=PLOT_TITLE_SIZE)
+
+    # real
+    ax[1].plot(_d_time, _d_simple_int, ".y", label="simple")
+    ax[1].plot(_d_time, _d_trap_int, ".b", label="trap")
+    ax[1].plot(_d_time, _d_kepler_int, ".r", label="simp")
+
+    # ideal
+    #ax[1].plot(_time, _i_simple_int, "w", label="simple")
+    #ax[1].plot(_time, _i_trap_int, "w", label="trap")
+    ax[1].plot(_time, _i_kepler_int, "w", label="simp")
+    
+
+
+
+    #ax[0][0].set_title("Input acceleration & rotation", fontsize=PLOT_TITLE_SIZE)
     ax[0].grid(alpha=0.25)
     ax[1].grid(alpha=0.25)
-    #ax[0].legend(loc="upper right")
-    #ax[0].set_ylabel('Acceleration [m/s^2],\nRotation [rad]', fontsize=PLOT_AXIS_LABEL_SIZE)
-    
-    
+    ax[1].legend(loc="upper right")
+    #ax[0][0].set_ylabel('Acceleration [m/s^2],\nRotation [rad]', fontsize=PLOT_AXIS_LABEL_SIZE)
+
 
     plt.show()
 
