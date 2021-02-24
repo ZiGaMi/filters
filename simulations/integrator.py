@@ -24,7 +24,7 @@ import numpy as np
 #   Sample frequency of real system   
 #
 # Unit: Hz
-SAMPLE_FREQ = 50.0
+SAMPLE_FREQ = 10.0
 
 # Ideal sample frequency
 #   As a reference to sample rate constrained embedded system
@@ -35,7 +35,7 @@ IDEAL_SAMPLE_FREQ = 20000.0
 ## Time window
 #
 # Unit: second
-TIME_WINDOW = 3.14
+TIME_WINDOW = 1
 
 
 ## ****** END OF USER CONFIGURATIONS ******
@@ -71,7 +71,11 @@ class TrapezoidIntegrator:
         self.dt = 1 / fs
 
     def update(self, x):
-        self.y += ( x + self.x_prev ) * self.dt / 2.0
+        #self.y += ( x + self.x_prev ) * self.dt / 4.0
+        
+        self.y += x * self.dt
+        self.y += ( x - self.x_prev ) * self.dt / 2.0
+
         self.x_prev = x
         return self.y
 
@@ -106,6 +110,8 @@ if __name__ == "__main__":
     # Time array
     _time, _dt = np.linspace( 0.0, TIME_WINDOW, num=SAMPLE_NUM, retstep=True )
 
+    # Input signal
+    _input_sig = [0] * SAMPLE_NUM
 
     # Create integrators
     _simple_int = SimpleIntegrator( fs=SAMPLE_FREQ )
@@ -128,19 +134,33 @@ if __name__ == "__main__":
     # Signal to integrate
     _x_d = [0]
 
-    K = -1
-    N = 1
-    input = 0
+    # Discrete signals
+    _d_time = [0]
+    _d_input = [0]
 
     # Down sample
     _downsamp_cnt = 0
     _downsamp_samp = [0]
-    _d_time = [0]
- 
+
+    # Generate ideal signal
+    for n, t in enumerate(_time):
+        _input_sig[n] = 10 *t**10
+        #_input_sig[n] = np.sin(t)
+        #_input_sig[n] = 20*t**3 - 10*t**2 - 6*t + 10 
+        #_input_sig[n] = np.sin( 2*np.pi*1.0*t )**2
+
+        """
+        if t > .5:
+            pass#_input_sig[n] = -t + 1
+
+        if t > 1.0:
+            _input_sig[n] = 1.0
+        """
+
     # Apply filter
     for n in range(SAMPLE_NUM):
         
-        input = np.sin( 2*_time[n] )
+        input = _input_sig[n]
 
         # Down sample to SAMPLE_FREQ
         if _downsamp_cnt >= (( 1 / ( _dt * SAMPLE_FREQ )) - 1 ):
@@ -159,6 +179,7 @@ if __name__ == "__main__":
             _d_simple_int.append( _simple_int.get())
             _d_trap_int.append( _trap_int.get())
             _d_kepler_int.append( _kepler_int.get())
+            _d_input.append( input )
 
             # Discrete input
             _x_d.append( input )
@@ -205,17 +226,19 @@ if __name__ == "__main__":
     fig.suptitle( PLOT_MAIN_TITLE , fontsize=PLOT_MAIN_TITLE_SIZE )
 
     # Subplot 0
-    ax[0].plot(_d_time, _x_d, "w")
+    ax[0].plot(_time, _input_sig, label="ideal")
+    ax[0].plot(_d_time, _d_input, ".y", label="sampled")
 
     # real
-    ax[1].plot(_d_time, _d_simple_int, ".y", label="simple")
-    ax[1].plot(_d_time, _d_trap_int, ".b", label="trap")
-    ax[1].plot(_d_time, _d_kepler_int, ".r", label="simp")
+   
+    ax[1].plot(_d_time, _d_simple_int, ".-w", label="simp")
+    ax[1].plot(_d_time, _d_trap_int, ".-y", label="trap")
+    ax[1].plot(_d_time, _d_kepler_int, ".-r", label="kep")
 
     # ideal
     #ax[1].plot(_time, _i_simple_int, "w", label="simple")
     #ax[1].plot(_time, _i_trap_int, "w", label="trap")
-    ax[1].plot(_time, _i_kepler_int, "w", label="simp")
+    #ax[1].plot(_time, _i_kepler_int, "w", label="simp")
     
 
 
