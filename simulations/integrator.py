@@ -96,7 +96,6 @@ class TrapezoidIntegrator:
     # @return:       void
     # ===============================================================================
     def __init__(self, fs):
-        self.y_prev = 0
         self.x_prev = 0
         self.y = 0
         self.dt = 1 / fs
