@@ -452,8 +452,8 @@ loop @SAMPLE_TIME
  - [ ] Add row selection to filter_csv.py
  - [x] Implementation of FIR filter in C   
  - [x] Implementation of IIR filter in C   
- - [ ] Evaluation of washout filter in python
- - [ ] Implementation of washout filter in C
+ - [x] Evaluation of washout filter in python
+ - [x] Implementation of washout filter in C
 
 
     
